@@ -1,0 +1,212 @@
+import {
+  Employee,
+  PayrollCategory,
+  AllowanceDeductionRule,
+  ProcessedAttendance,
+  IncentiveRecord,
+  CompanySettings,
+  CalculatedSalaryRecord,
+  PayrollPeriod
+} from '../types';
+
+export interface SingleEmployeeSalaryInput {
+  employee: Employee;
+  workedDays: number;
+  unpaidLeaveDays: number;
+  otHours: number;
+  lateMinutes: number;
+  incentiveAmount?: number;
+  loanDeduction?: number;
+  advanceDeduction?: number;
+  otherDeductions?: number;
+  settings: CompanySettings;
+  rules: AllowanceDeductionRule[];
+}
+
+export class PayrollEngine {
+  /**
+   * Calculates allowance deduction based on configured rule and unpaid days
+   */
+  public static calculateAllowanceDeduction(
+    fixedAllowance: number,
+    unpaidDays: number,
+    rules: AllowanceDeductionRule[]
+  ): {
+    deductionAmount: number;
+    remainingAllowance: number;
+    breakdown: string;
+  } {
+    if (unpaidDays <= 0 || fixedAllowance <= 0) {
+      return {
+        deductionAmount: 0,
+        remainingAllowance: fixedAllowance,
+        breakdown: 'No unpaid leave taken. Full allowance payable.'
+      };
+    }
+
+    const rule = rules.find(r => r.isActive !== false) || rules[0];
+    if (!rule) {
+      return {
+        deductionAmount: 0,
+        remainingAllowance: fixedAllowance,
+        breakdown: 'No active deduction rule found.'
+      };
+    }
+
+    let deduction = 0;
+    const breakdownParts: string[] = [];
+
+    // TIERED RULE
+    if (rule.ruleType === 'TIERED' || rule.ruleType === 'TIERED_DAYS') {
+      const tiers = rule.tiers || [];
+      for (let day = 1; day <= unpaidDays; day++) {
+        const tier = tiers.find(t => t.dayNumber === day);
+        if (tier) {
+          deduction += tier.deductionAmount;
+          breakdownParts.push(`Day ${day}: -Rs. ${tier.deductionAmount}`);
+        } else {
+          const beyondDeduction = rule.defaultDeductionBeyondTiers ?? 1000;
+          deduction += beyondDeduction;
+          breakdownParts.push(`Day ${day}: -Rs. ${beyondDeduction} (extra)`);
+        }
+      }
+    } else if (rule.ruleType === 'DAILY_PRORATA') {
+      const dailyRate = fixedAllowance / 25;
+      deduction = Math.round(dailyRate * unpaidDays);
+      breakdownParts.push(`${unpaidDays} days × (Rs. ${fixedAllowance} ÷ 25)`);
+    } else if (rule.ruleType === 'PERCENTAGE') {
+      const rate = rule.percentageRate || 4;
+      deduction = Math.round(fixedAllowance * (rate / 100) * unpaidDays);
+      breakdownParts.push(`${unpaidDays} days × ${rate}%`);
+    }
+
+    // Never deduct more than the allowance itself (Allowance can never become negative)
+    const cappedDeduction = Math.min(deduction, fixedAllowance);
+    const remaining = Math.max(0, fixedAllowance - cappedDeduction);
+
+    return {
+      deductionAmount: cappedDeduction,
+      remainingAllowance: remaining,
+      breakdown: breakdownParts.join(' + ') + ` = Total Rs. ${cappedDeduction.toLocaleString()}`
+    };
+  }
+
+  /**
+   * Calculates a single employee's monthly salary components
+   */
+  public static calculateEmployeeSalary(input: SingleEmployeeSalaryInput): CalculatedSalaryRecord {
+    const {
+      employee: emp,
+      workedDays,
+      unpaidLeaveDays,
+      otHours,
+      lateMinutes,
+      incentiveAmount = 0,
+      loanDeduction = 0,
+      advanceDeduction = 0,
+      otherDeductions = 0,
+      settings,
+      rules
+    } = input;
+
+    const workingDays = emp.workingDaysPerMonth || settings.defaultWorkingDaysPerMonth || 25;
+    const normalHours = emp.normalWorkingHours || settings.normalWorkingHoursPerDay || 8;
+
+    // 1. Basic Salary & No-Pay basic deduction
+    // Formula: Basic Daily Rate = Basic Salary ÷ Working Days (default 25)
+    const basicSalary = emp.basicSalary || 0;
+    const basicDailyRate = workingDays > 0 ? basicSalary / workingDays : 0;
+    const noPayBasicDeduction = Math.round(basicDailyRate * unpaidLeaveDays);
+    const netBasicSalary = Math.max(0, basicSalary - noPayBasicDeduction);
+
+    // 2. Fixed Allowance & Allowance Deduction Rule
+    const fixedAllowance = emp.fixedAllowance || 0;
+    const otherAllowance = emp.otherAllowance || 0;
+    const totalAllowances = fixedAllowance + otherAllowance;
+
+    const allowanceResult = this.calculateAllowanceDeduction(fixedAllowance, unpaidLeaveDays, rules);
+    const noPayAllowanceDeduction = allowanceResult.deductionAmount;
+    const netAllowance = Math.max(0, totalAllowances - noPayAllowanceDeduction);
+
+    // 3. Overtime (OT) Calculation
+    // Formula: Hourly Rate = (Basic Salary ÷ 200) or (Basic ÷ (25 × 8)) × 1.5
+    const standardHourlyDivisor = workingDays * normalHours || 200;
+    const standardHourlyRate = standardHourlyDivisor > 0 ? basicSalary / standardHourlyDivisor : 0;
+    const otRateMultiplier = 1.5;
+    const otHourlyRate =
+      emp.otRateType === 'FIXED_HOURLY' && emp.otCustomHourlyRate
+        ? emp.otCustomHourlyRate
+        : standardHourlyRate * otRateMultiplier;
+
+    const otAmount = Math.round(otHourlyRate * otHours);
+
+    // 4. Gross Salary
+    // Gross = Net Basic + Net Allowance + OT + Incentives
+    const grossSalary = netBasicSalary + netAllowance + otAmount + incentiveAmount;
+
+    // 5. Sri Lankan Statutory Contributions (EPF / ETF)
+    // Liable salary = Basic Salary - No-pay basic deduction
+    const epfLiableSalary = netBasicSalary;
+
+    const epfEmpRate = settings.epfEmployeeRate || 8;
+    const epfEmplrRate = settings.epfEmployerRate || 12;
+    const etfEmplrRate = settings.etfEmployerRate || 3;
+
+    const epfEmployeeAmount = Math.round((epfLiableSalary * epfEmpRate) / 100);
+    const epfEmployerAmount = Math.round((epfLiableSalary * epfEmplrRate) / 100);
+    const etfEmployerAmount = Math.round((epfLiableSalary * etfEmplrRate) / 100);
+
+    // 6. Deductions & Net Salary
+    const totalDeductions = epfEmployeeAmount + advanceDeduction + loanDeduction + otherDeductions;
+    const netSalary = Math.max(0, grossSalary - totalDeductions);
+
+    // Cost to Company (CTC) = Gross Salary + Employer EPF 12% + Employer ETF 3%
+    const costToCompany = grossSalary + epfEmployerAmount + etfEmployerAmount;
+
+    return {
+      id: `sal-${emp.id}`,
+      employeeId: emp.id,
+      employeeCode: emp.employeeCode,
+      employeeName: emp.fullName,
+      nameSinhala: emp.nameSinhala,
+      nameTamil: emp.nameTamil,
+      nic: emp.nic,
+      epfNumber: emp.epfNumber,
+      departmentName: 'Production & Ops',
+      designationTitle: 'Staff',
+      bankName: emp.bankName,
+      bankAccountNumber: emp.bankAccountNumber,
+      workingDays,
+      workedDays,
+      unpaidLeaveDays,
+      otHours,
+      lateMinutes,
+      basicSalary,
+      basicDailyRate: Math.round(basicDailyRate * 100) / 100,
+      noPayBasicDeduction,
+      netBasicSalary,
+      fixedAllowance,
+      otherAllowance,
+      totalAllowances,
+      noPayAllowanceDeduction,
+      netAllowance,
+      otHourlyRate: Math.round(otHourlyRate * 100) / 100,
+      otAmount,
+      incentives: incentiveAmount,
+      grossSalary,
+      epfLiableSalary,
+      epfEmployeeRate: epfEmpRate,
+      epfEmployeeAmount,
+      epfEmployerRate: epfEmplrRate,
+      epfEmployerAmount,
+      etfEmployerRate: etfEmplrRate,
+      etfEmployerAmount,
+      loanDeductions: loanDeduction,
+      salaryAdvance: advanceDeduction,
+      otherDeductions,
+      totalDeductions,
+      netSalary,
+      costToCompany
+    };
+  }
+}
