@@ -20,7 +20,12 @@ import {
   CalculatedSalaryRecord,
   CompanySettings,
   AllowanceDeductionRule,
-  Language
+  Language,
+  Department,
+  Designation,
+  EmployeeLeave,
+  IncentiveRecord,
+  PayrollCategory
 } from '../../types';
 import { translations } from '../../i18n/translations';
 import { PayrollEngine } from '../../services/payrollEngine';
@@ -35,6 +40,11 @@ interface PayrollGenerationViewProps {
   payrollPeriod?: PayrollPeriod;
   settings: CompanySettings;
   allowanceRules: AllowanceDeductionRule[];
+  departments?: Department[];
+  designations?: Designation[];
+  leaves?: EmployeeLeave[];
+  incentives?: IncentiveRecord[];
+  payrollCategories?: PayrollCategory[];
   onSavePayrollPeriod: (period: PayrollPeriod) => void;
   onNavigate: (tab: ActiveTab) => void;
 }
@@ -48,6 +58,11 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
   payrollPeriod,
   settings,
   allowanceRules,
+  departments = [],
+  designations = [],
+  leaves = [],
+  incentives = [],
+  payrollCategories = [],
   onSavePayrollPeriod,
   onNavigate
 }) => {
@@ -59,14 +74,14 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
 
   const handleCalculatePayroll = () => {
     setIsCalculating(true);
-    setCalculationStep('Step 1: Reading biometric attendance & unpaid leave...');
+    setCalculationStep('Step 1: Reading biometric attendance & leave records...');
 
     setTimeout(() => {
       setCalculationStep('Step 2: Computing basic daily deductions (Basic ÷ 25)...');
       setTimeout(() => {
         setCalculationStep('Step 3: Evaluating Tiered Allowance deduction matrix...');
         setTimeout(() => {
-          setCalculationStep('Step 4: Computing Overtime (1.5x) & Sri Lankan EPF/ETF (8%, 12%, 3%)...');
+          setCalculationStep('Step 4: Computing Overtime (1.5x/2.0x) & Sri Lankan EPF/ETF (8%, 12%, 3%)...');
           setTimeout(() => {
             const calculatedRecords: CalculatedSalaryRecord[] = [];
 
@@ -76,27 +91,55 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
                 a => a.employeeId === emp.id && a.date.startsWith(currentMonth)
               );
 
-              const workedDays = empAtt.filter(a => a.status === 'PRESENT').length;
-              // No-pay days = either marked NO_PAY or ABSENT
-              const noPayDays = empAtt.filter(a => a.status === 'NO_PAY' || a.status === 'ABSENT').length;
-              const otHours = empAtt.reduce((sum, a) => sum + (a.otHours || 0), 0);
-              const lateMins = empAtt.reduce((sum, a) => sum + (a.lateMinutes || 0), 0);
+              const workedDaysFromAtt = empAtt.filter(a => a.status === 'PRESENT' || a.status === 'HALF_DAY').length;
+              const noPayDaysFromAtt = empAtt.filter(a => a.status === 'NO_PAY' || a.status === 'ABSENT').length;
 
-              // Preserve existing loan/advance/incentive if previously entered
+              // Read approved unpaid leaves for this employee in the month
+              const empLeaves = leaves.filter(
+                l => l.employeeId === emp.id &&
+                l.status === 'APPROVED' &&
+                (l.startDate.startsWith(currentMonth) || l.endDate.startsWith(currentMonth))
+              );
+
+              const noPayLeaveDays = empLeaves
+                .filter(l => l.leaveTypeId === 'lt-04' || l.leaveTypeId.toLowerCase().includes('no_pay') || l.leaveTypeId.toLowerCase().includes('unpaid'))
+                .reduce((sum, l) => sum + (Number(l.daysCount) || 0), 0);
+
+              // Total unpaid/no-pay days (max of attendance absence or leave requests)
+              const totalUnpaidDays = Math.max(noPayDaysFromAtt, noPayLeaveDays);
+
+              const standardWorkingDays = emp.workingDaysPerMonth || settings.defaultWorkingDaysPerMonth || 25;
+              const calculatedWorkedDays = workedDaysFromAtt > 0
+                ? workedDaysFromAtt
+                : Math.max(0, standardWorkingDays - totalUnpaidDays);
+
+              const otHours = empAtt.reduce((sum, a) => sum + (Number(a.otHours) || 0), 0);
+              const lateMins = empAtt.reduce((sum, a) => sum + (Number(a.lateMinutes) || 0), 0);
+
+              // Read real approved incentives from DB
+              const employeeIncentives = incentives.filter(
+                i => i.employeeId === emp.id && i.payrollMonth === currentMonth
+              );
+              const realIncentiveTotal = employeeIncentives.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+
+              // Preserve existing manual adjustments if present
               const existingRecord = payrollPeriod?.records.find(r => r.employeeId === emp.id);
 
               const calc = PayrollEngine.calculateEmployeeSalary({
                 employee: emp,
-                workedDays: workedDays || emp.workingDaysPerMonth - noPayDays,
-                unpaidLeaveDays: noPayDays,
+                workedDays: calculatedWorkedDays,
+                unpaidLeaveDays: totalUnpaidDays,
                 otHours,
                 lateMinutes: lateMins,
-                incentiveAmount: existingRecord?.incentives || 0,
+                incentiveAmount: realIncentiveTotal > 0 ? realIncentiveTotal : (existingRecord?.incentives || 0),
                 loanDeduction: existingRecord?.loanDeductions || 0,
                 advanceDeduction: existingRecord?.salaryAdvance || 0,
                 otherDeductions: existingRecord?.otherDeductions || 0,
                 settings,
-                rules: allowanceRules
+                rules: allowanceRules,
+                categories: payrollCategories,
+                departments,
+                designations
               });
 
               calculatedRecords.push({
@@ -131,10 +174,10 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
             onSavePayrollPeriod(updatedPeriod);
             setIsCalculating(false);
             setCalculationStep('');
-          }, 400);
-        }, 400);
-      }, 400);
-    }, 400);
+          }, 300);
+        }, 300);
+      }, 300);
+    }, 300);
   };
 
   const handleToggleLock = () => {

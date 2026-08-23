@@ -6,7 +6,9 @@ import {
   IncentiveRecord,
   CompanySettings,
   CalculatedSalaryRecord,
-  PayrollPeriod
+  PayrollPeriod,
+  Department,
+  Designation
 } from '../types';
 
 export interface SingleEmployeeSalaryInput {
@@ -21,6 +23,9 @@ export interface SingleEmployeeSalaryInput {
   otherDeductions?: number;
   settings: CompanySettings;
   rules: AllowanceDeductionRule[];
+  categories?: PayrollCategory[];
+  departments?: Department[];
+  designations?: Designation[];
 }
 
 export class PayrollEngine {
@@ -30,7 +35,8 @@ export class PayrollEngine {
   public static calculateAllowanceDeduction(
     fixedAllowance: number,
     unpaidDays: number,
-    rules: AllowanceDeductionRule[]
+    rules: AllowanceDeductionRule[],
+    ruleId?: string
   ): {
     deductionAmount: number;
     remainingAllowance: number;
@@ -44,7 +50,12 @@ export class PayrollEngine {
       };
     }
 
-    const rule = rules.find(r => r.isActive !== false) || rules[0];
+    // Select the employee-specific rule, or default active rule
+    let rule = ruleId ? rules.find(r => r.id === ruleId) : undefined;
+    if (!rule) {
+      rule = rules.find(r => r.isDefault && r.isActive !== false) || rules.find(r => r.isActive !== false) || rules[0];
+    }
+
     if (!rule) {
       return {
         deductionAmount: 0,
@@ -56,7 +67,7 @@ export class PayrollEngine {
     let deduction = 0;
     const breakdownParts: string[] = [];
 
-    // TIERED RULE
+    // TIERED RULE (Customer Specific Matrix: Day 1=1500, Day 2=1500, Day 3=1000, Day 4=1000, etc.)
     if (rule.ruleType === 'TIERED' || rule.ruleType === 'TIERED_DAYS') {
       const tiers = rule.tiers || [];
       for (let day = 1; day <= unpaidDays; day++) {
@@ -92,7 +103,7 @@ export class PayrollEngine {
   }
 
   /**
-   * Calculates a single employee's monthly salary components
+   * Calculates a single employee's monthly salary components with full Sri Lankan statutory compliance
    */
   public static calculateEmployeeSalary(input: SingleEmployeeSalaryInput): CalculatedSalaryRecord {
     const {
@@ -106,33 +117,46 @@ export class PayrollEngine {
       advanceDeduction = 0,
       otherDeductions = 0,
       settings,
-      rules
+      rules,
+      categories = [],
+      departments = [],
+      designations = []
     } = input;
 
     const workingDays = emp.workingDaysPerMonth || settings.defaultWorkingDaysPerMonth || 25;
     const normalHours = emp.normalWorkingHours || settings.normalWorkingHoursPerDay || 8;
 
     // 1. Basic Salary & No-Pay basic deduction
-    // Formula: Basic Daily Rate = Basic Salary ÷ Working Days (default 25)
+    // Formula: Basic Daily Rate = Basic Salary ÷ Working Days (e.g. 30,000 ÷ 25 = 1,200/day)
     const basicSalary = emp.basicSalary || 0;
     const basicDailyRate = workingDays > 0 ? basicSalary / workingDays : 0;
     const noPayBasicDeduction = Math.round(basicDailyRate * unpaidLeaveDays);
     const netBasicSalary = Math.max(0, basicSalary - noPayBasicDeduction);
 
-    // 2. Fixed Allowance & Allowance Deduction Rule
+    // 2. Fixed Allowance & Tiered Allowance Deduction Rule
     const fixedAllowance = emp.fixedAllowance || 0;
     const otherAllowance = emp.otherAllowance || 0;
     const totalAllowances = fixedAllowance + otherAllowance;
 
-    const allowanceResult = this.calculateAllowanceDeduction(fixedAllowance, unpaidLeaveDays, rules);
+    // Resolve employee rule
+    const category = categories.find(c => c.id === emp.payrollCategoryId);
+    const targetRuleId = emp.allowanceDeductionRuleId || category?.allowanceDeductionRuleId;
+    const allowanceResult = this.calculateAllowanceDeduction(fixedAllowance, unpaidLeaveDays, rules, targetRuleId);
     const noPayAllowanceDeduction = allowanceResult.deductionAmount;
     const netAllowance = Math.max(0, totalAllowances - noPayAllowanceDeduction);
 
     // 3. Overtime (OT) Calculation
-    // Formula: Hourly Rate = (Basic Salary ÷ 200) or (Basic ÷ (25 × 8)) × 1.5
+    // Multiplier options: 1.5x (Standard), 2.0x (Holiday/Sunday), or Fixed Custom Rate
     const standardHourlyDivisor = workingDays * normalHours || 200;
     const standardHourlyRate = standardHourlyDivisor > 0 ? basicSalary / standardHourlyDivisor : 0;
-    const otRateMultiplier = 1.5;
+
+    let otRateMultiplier = 1.5;
+    if (emp.otRateType === '2.0X_HOLIDAY') {
+      otRateMultiplier = 2.0;
+    } else if (category?.defaultOtMultiplier) {
+      otRateMultiplier = category.defaultOtMultiplier;
+    }
+
     const otHourlyRate =
       emp.otRateType === 'FIXED_HOURLY' && emp.otCustomHourlyRate
         ? emp.otCustomHourlyRate
@@ -141,20 +165,23 @@ export class PayrollEngine {
     const otAmount = Math.round(otHourlyRate * otHours);
 
     // 4. Gross Salary
-    // Gross = Net Basic + Net Allowance + OT + Incentives
+    // Gross = Net Basic + Net Allowance + OT + Real Incentives
     const grossSalary = netBasicSalary + netAllowance + otAmount + incentiveAmount;
 
     // 5. Sri Lankan Statutory Contributions (EPF / ETF)
     // Liable salary = Basic Salary - No-pay basic deduction
     const epfLiableSalary = netBasicSalary;
 
-    const epfEmpRate = settings.epfEmployeeRate || 8;
-    const epfEmplrRate = settings.epfEmployerRate || 12;
-    const etfEmplrRate = settings.etfEmployerRate || 3;
+    const isEpfEnabled = emp.epfEnabled !== false;
+    const isEtfEnabled = emp.etfEnabled !== false;
 
-    const epfEmployeeAmount = Math.round((epfLiableSalary * epfEmpRate) / 100);
-    const epfEmployerAmount = Math.round((epfLiableSalary * epfEmplrRate) / 100);
-    const etfEmployerAmount = Math.round((epfLiableSalary * etfEmplrRate) / 100);
+    const epfEmpRate = isEpfEnabled ? (category?.epfRateEmployee ?? settings.epfEmployeeRate ?? 8) : 0;
+    const epfEmplrRate = isEpfEnabled ? (category?.epfRateEmployer ?? settings.epfEmployerRate ?? 12) : 0;
+    const etfEmplrRate = isEtfEnabled ? (category?.etfRateEmployer ?? settings.etfEmployerRate ?? 3) : 0;
+
+    const epfEmployeeAmount = isEpfEnabled ? Math.round((epfLiableSalary * epfEmpRate) / 100) : 0;
+    const epfEmployerAmount = isEpfEnabled ? Math.round((epfLiableSalary * epfEmplrRate) / 100) : 0;
+    const etfEmployerAmount = isEtfEnabled ? Math.round((epfLiableSalary * etfEmplrRate) / 100) : 0;
 
     // 6. Deductions & Net Salary
     const totalDeductions = epfEmployeeAmount + advanceDeduction + loanDeduction + otherDeductions;
@@ -162,6 +189,12 @@ export class PayrollEngine {
 
     // Cost to Company (CTC) = Gross Salary + Employer EPF 12% + Employer ETF 3%
     const costToCompany = grossSalary + epfEmployerAmount + etfEmployerAmount;
+
+    // Resolve Department & Designation dynamically
+    const dept = departments.find(d => d.id === emp.departmentId);
+    const desig = designations.find(d => d.id === emp.designationId);
+    const departmentName = dept ? dept.name : 'General';
+    const designationTitle = desig ? desig.title : 'Staff';
 
     return {
       id: `sal-${emp.id}`,
@@ -172,8 +205,10 @@ export class PayrollEngine {
       nameTamil: emp.nameTamil,
       nic: emp.nic,
       epfNumber: emp.epfNumber,
-      departmentName: 'Production & Ops',
-      designationTitle: 'Staff',
+      epfEnabled: isEpfEnabled,
+      etfEnabled: isEtfEnabled,
+      departmentName,
+      designationTitle,
       bankName: emp.bankName,
       bankAccountNumber: emp.bankAccountNumber,
       workingDays,
@@ -201,8 +236,10 @@ export class PayrollEngine {
       epfEmployerAmount,
       etfEmployerRate: etfEmplrRate,
       etfEmployerAmount,
-      loanDeductions: loanDeduction,
+      advanceDeduction,
       salaryAdvance: advanceDeduction,
+      loanDeduction,
+      loanDeductions: loanDeduction,
       otherDeductions,
       totalDeductions,
       netSalary,

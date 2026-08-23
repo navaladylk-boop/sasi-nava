@@ -52,9 +52,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const todayStr = new Date().toISOString().substring(0, 10);
   const todayAttendance = attendance.filter(a => a.date === todayStr);
 
-  const presentCount = todayAttendance.filter(a => a.status === 'PRESENT').length || Math.floor(totalEmpCount * 0.85);
-  const absentCount = todayAttendance.filter(a => a.status === 'ABSENT' || a.status === 'NO_PAY').length || Math.max(0, totalEmpCount - presentCount - 1);
-  const onLeaveCount = todayAttendance.filter(a => a.status === 'LEAVE').length || 1;
+  const presentCount = todayAttendance.filter(a => a.status === 'PRESENT').length;
+  const absentCount = todayAttendance.filter(a => a.status === 'ABSENT' || a.status === 'NO_PAY').length;
+  const onLeaveCount = todayAttendance.filter(a => a.status === 'LEAVE').length;
 
   const isCalculated = payrollPeriod && payrollPeriod.status !== 'DRAFT';
   const onlineDevices = devices.filter(d => d.status === 'ONLINE').length;
@@ -221,20 +221,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#4b5563] font-medium">Previous Month (Dec 2025)</span>
-                  <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    PAID
-                  </span>
-                </div>
-                <div className="h-[1px] bg-[#e5e7eb] w-full"></div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#4b5563] font-medium">Current Month ({currentMonth})</span>
+                  <span className="text-xs text-[#4b5563] font-medium">Monthly Status ({currentMonth})</span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    payrollPeriod?.epfPaid
+                    payrollPeriod?.isEpfPaid || payrollPeriod?.epfPaid
                       ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
+                      : isCalculated
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-slate-100 text-slate-700'
                   }`}>
-                    {payrollPeriod?.epfPaid ? 'PAID' : 'UNPAID'}
+                    {payrollPeriod?.isEpfPaid || payrollPeriod?.epfPaid ? 'PAID' : isCalculated ? 'UNPAID' : 'PENDING'}
                   </span>
                 </div>
               </div>
@@ -243,7 +238,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="p-3 bg-[#f3f4f6] rounded border border-[#e5e7eb] mt-4">
               <p className="text-[10px] text-[#6b7280] mb-0.5 font-bold uppercase">Estimated Statutory Total</p>
               <p className="text-lg font-mono font-bold text-[#111827]">
-                LKR {payrollPeriod ? (((payrollPeriod.totalEpfEmployee ?? 0) + (payrollPeriod.totalEpfEmployer ?? 0) + (payrollPeriod.totalEtfEmployer ?? 0))).toLocaleString() : '185,400.00'}
+                LKR {payrollPeriod ? (((payrollPeriod.totalEpfEmployee ?? 0) + (payrollPeriod.totalEpfEmployer ?? 0) + (payrollPeriod.totalEtfEmployer ?? 0))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
               </p>
               <p className="text-[10px] text-[#6b7280] mt-0.5">EPF (8%+12%) + ETF (3%)</p>
             </div>

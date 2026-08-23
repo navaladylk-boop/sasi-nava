@@ -46,6 +46,8 @@ export interface Employee {
   employmentStatus: 'PERMANENT' | 'PROBATION' | 'CONTRACT' | 'CASUAL' | 'RESIGNED';
   epfNumber: string;
   etfNumber?: string;
+  epfEnabled?: boolean; // true by default (enable/disable EPF statutory deductions)
+  etfEnabled?: boolean; // true by default (enable/disable ETF statutory contributions)
   basicSalary: number;
   fixedAllowance: number;
   otherAllowance: number;
@@ -57,6 +59,7 @@ export interface Employee {
   normalWorkingHours: number; // e.g. 8
   otRateType: OtRateType;
   otCustomHourlyRate?: number;
+  allowanceDeductionRuleId?: string;
   fingerprintUserId: string; // ID assigned inside biometric machine
   isActive: boolean;
 }
@@ -182,9 +185,14 @@ export interface AllowanceDeductionRule {
 export interface PayrollCategory {
   id: string;
   name: string;
+  code?: string;
+  description?: string;
   workingDaysDivisor: number; // default 25
   defaultOtMultiplier: number; // e.g. 1.5
   allowanceDeductionRuleId: string;
+  epfRateEmployee?: number; // e.g. 8
+  epfRateEmployer?: number; // e.g. 12
+  etfRateEmployer?: number; // e.g. 3
 }
 
 export type IncentiveType =
@@ -250,6 +258,8 @@ export interface CalculatedSalaryRecord {
   grossSalary: number;
 
   // Sri Lankan Statutory Contributions
+  epfEnabled?: boolean;
+  etfEnabled?: boolean;
   epfLiableSalary: number;
   epfEmployeeRate: number;
   epfEmployeeAmount: number; // 8%
@@ -260,7 +270,9 @@ export interface CalculatedSalaryRecord {
 
   // Deductions
   loanDeductions: number;
+  loanDeduction?: number;
   salaryAdvance: number;
+  advanceDeduction?: number;
   otherDeductions: number;
   totalDeductions: number;
 

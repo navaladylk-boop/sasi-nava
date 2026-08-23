@@ -37,233 +37,41 @@ export interface DatabaseState {
   auditLogs: AuditLog[];
 }
 
-const STORAGE_KEY = 'LANKA_HR_DATABASE_V2';
+const STORAGE_KEY = 'LANKA_HR_DATABASE_V3';
 
-const defaultSettings: CompanySettings = {
+export const defaultSettings: CompanySettings = {
   id: 'company-01',
-  companyName: 'Lanka Precision Engineering (Pvt) Ltd',
-  companyNameSinhala: 'ලංකා ප්‍රිසිෂන් ඉංජිනේරු (පුද්) සමාගම',
-  companyNameTamil: 'லங்கா பிரிசிஷன் இன்ஜினியரிங் (பிரைவேட்) லிமிடெட்',
-  address: 'No. 45/2, Nawala Road, Narahenpita, Colombo 05, Sri Lanka',
-  telephone: '+94 11 280 4455 / +94 77 123 4567',
-  email: 'info@lankaprecision.lk',
-  registrationNo: 'PV-108249',
-  epfRegistrationNumber: 'EPF/2024/09871',
+  companyName: 'Lanka Industrial Manufacturing (Pvt) Ltd',
+  companyNameSinhala: 'ලංකා ඉන්ඩස්ට්‍රියල් මැනුෆැක්චරින් (පුද්) සමාගම',
+  companyNameTamil: 'லங்கா தொழில்துறை உற்பத்தி (பிரைவேட்) லிமிடெட்',
+  address: 'No 45, Baseline Road, Colombo 09, Sri Lanka',
+  telephone: '+94 11 268 9000',
+  email: 'hr@lankamanufacturing.lk',
+  registrationNo: 'PV 12048',
+  epfRegistrationNumber: 'EPF/C/89124',
+  epfEmployerNo: '89124',
   defaultWorkingDaysPerMonth: 25,
+  defaultWorkingDays: 25,
   normalWorkingHoursPerDay: 8,
+  defaultWorkingHours: 8,
   shiftStartTime: '08:30',
   shiftEndTime: '17:00',
   lateGraceMinutes: 15,
   epfEmployeeRate: 8,
+  epfEmployeePercent: 8,
   epfEmployerRate: 12,
+  epfEmployerPercent: 12,
   etfEmployerRate: 3,
+  etfEmployerPercent: 3,
+  epfCalculationBasis: 'BASIC_MINUS_NOPAY',
+  defaultOtHourlyRateMultiplier: 1.5,
+  currencySymbol: 'Rs.',
   defaultLanguage: 'en',
+  language: 'en',
   currentUserId: 'usr-admin'
 };
 
-const initialDepartments: Department[] = [
-  { id: 'dept-01', code: 'PROD', name: 'Factory Production', nameSinhala: 'කර්මාන්තශාලා නිෂ්පාදන', nameTamil: 'தொழிற்சாலை உற்பத்தி' },
-  { id: 'dept-02', code: 'ENG', name: 'Engineering & Maintenance', nameSinhala: 'ඉංජිනේරු සහ නඩත්තු', nameTamil: 'பொறியியல் மற்றும் பராமரிப்பு' },
-  { id: 'dept-03', code: 'LOG', name: 'Logistics & Warehouse', nameSinhala: 'ප්‍රවාහන සහ ගබඩා', nameTamil: 'தளவாடங்கள் மற்றும் கிடங்கு' },
-  { id: 'dept-04', code: 'ADMIN', name: 'Admin & Accounts', nameSinhala: 'පරිපාලන සහ ගිණුම්', nameTamil: 'நிர்வாகம் மற்றும் கணக்குகள்' }
-];
-
-const initialDesignations: Designation[] = [
-  { id: 'des-01', code: 'MCH-OP', title: 'Senior CNC Machine Operator', departmentId: 'dept-01' },
-  { id: 'des-02', code: 'QC-INSP', title: 'Quality Control Inspector', departmentId: 'dept-01' },
-  { id: 'des-03', code: 'ENG-TECH', title: 'Maintenance Technician', departmentId: 'dept-02' },
-  { id: 'des-04', code: 'WH-SUP', title: 'Warehouse Supervisor', departmentId: 'dept-03' },
-  { id: 'des-05', code: 'ACC-EXEC', title: 'Accounts Executive', departmentId: 'dept-04' }
-];
-
-const initialEmployees: Employee[] = [
-  {
-    id: 'emp-01',
-    employeeCode: 'EMP-1001',
-    fullName: 'Kasun Chamara Perera',
-    nameSinhala: 'කසුන් චාමර පෙරේරා',
-    nameTamil: 'கசுன் சாமர பெரேரா',
-    nic: '199214508210',
-    dob: '1992-05-24',
-    gender: 'MALE',
-    address: 'No. 12/A, Temple Road, Maharagama',
-    telephone: '077 345 6789',
-    email: 'kasun.p@lankaprecision.lk',
-    departmentId: 'dept-01',
-    designationId: 'des-01',
-    joinDate: '2021-02-15',
-    employmentStatus: 'PERMANENT',
-    epfNumber: 'EPF-4011',
-    etfNumber: 'ETF-4011',
-    basicSalary: 65000,
-    fixedAllowance: 15000,
-    otherAllowance: 5000,
-    bankName: 'Bank of Ceylon (BOC)',
-    bankAccountNumber: '008920148902',
-    branch: 'Maharagama (722)',
-    payrollCategoryId: 'cat-01',
-    workingDaysPerMonth: 25,
-    normalWorkingHours: 8,
-    otRateType: '1.5X_STANDARD',
-    fingerprintUserId: '1001',
-    isActive: true
-  },
-  {
-    id: 'emp-02',
-    employeeCode: 'EMP-1002',
-    fullName: 'Sanduni Dilrukshi Silva',
-    nameSinhala: 'සඳුනි දිල්රුක්ෂි සිල්වා',
-    nameTamil: 'சந்துனி தில்ருக்சி சில்வா',
-    nic: '199581203490',
-    dob: '1995-11-12',
-    gender: 'FEMALE',
-    address: 'No. 88, Galle Road, Moratuwa',
-    telephone: '071 987 6543',
-    email: 'sanduni.s@lankaprecision.lk',
-    departmentId: 'dept-01',
-    designationId: 'des-02',
-    joinDate: '2022-06-01',
-    employmentStatus: 'PERMANENT',
-    epfNumber: 'EPF-4012',
-    etfNumber: 'ETF-4012',
-    basicSalary: 55000,
-    fixedAllowance: 12000,
-    otherAllowance: 3000,
-    bankName: 'Commercial Bank of Ceylon',
-    bankAccountNumber: '8004192044',
-    branch: 'Moratuwa (104)',
-    payrollCategoryId: 'cat-01',
-    workingDaysPerMonth: 25,
-    normalWorkingHours: 8,
-    otRateType: '1.5X_STANDARD',
-    fingerprintUserId: '1002',
-    isActive: true
-  },
-  {
-    id: 'emp-03',
-    employeeCode: 'EMP-1003',
-    fullName: 'Mohamed Rizwan Farook',
-    nameSinhala: 'මොහොමඩ් රිස්වාන් ෆාරුක්',
-    nameTamil: 'முகம்மது ரிஸ்வான் பாரூக்',
-    nic: '198923001920',
-    dob: '1989-08-19',
-    gender: 'MALE',
-    address: 'No. 34, Moor Street, Colombo 12',
-    telephone: '076 555 1234',
-    email: 'rizwan.f@lankaprecision.lk',
-    departmentId: 'dept-02',
-    designationId: 'des-03',
-    joinDate: '2020-01-10',
-    employmentStatus: 'PERMANENT',
-    epfNumber: 'EPF-4013',
-    etfNumber: 'ETF-4013',
-    basicSalary: 72000,
-    fixedAllowance: 18000,
-    otherAllowance: 5000,
-    bankName: 'Hatton National Bank (HNB)',
-    bankAccountNumber: '045010098412',
-    branch: 'Pettah (045)',
-    payrollCategoryId: 'cat-01',
-    workingDaysPerMonth: 25,
-    normalWorkingHours: 8,
-    otRateType: '1.5X_STANDARD',
-    fingerprintUserId: '1003',
-    isActive: true
-  },
-  {
-    id: 'emp-04',
-    employeeCode: 'EMP-1004',
-    fullName: 'Suresh Kumar Velupillai',
-    nameSinhala: 'සුරේෂ් කුමාර් වේලුපිල්ලෙයි',
-    nameTamil: 'சுரேஷ் குமார் வேலுப்பிள்ளை',
-    nic: '199104902188',
-    dob: '1991-03-04',
-    gender: 'MALE',
-    address: 'No. 15, Station Road, Wattala',
-    telephone: '075 222 9988',
-    email: 'suresh.v@lankaprecision.lk',
-    departmentId: 'dept-03',
-    designationId: 'des-04',
-    joinDate: '2023-04-18',
-    employmentStatus: 'PERMANENT',
-    epfNumber: 'EPF-4014',
-    etfNumber: 'ETF-4014',
-    basicSalary: 58000,
-    fixedAllowance: 10000,
-    otherAllowance: 4000,
-    bankName: 'Sampath Bank PLC',
-    bankAccountNumber: '100854201944',
-    branch: 'Wattala (008)',
-    payrollCategoryId: 'cat-01',
-    workingDaysPerMonth: 25,
-    normalWorkingHours: 8,
-    otRateType: '1.5X_STANDARD',
-    fingerprintUserId: '1004',
-    isActive: true
-  },
-  {
-    id: 'emp-05',
-    employeeCode: 'EMP-1005',
-    fullName: 'Anoma Priyadarshani Fernando',
-    nameSinhala: 'අනෝමා ප්‍රියදර්ශනී ප්‍රනාන්දු',
-    nameTamil: 'அனோமா பிரியதர்ஷினி பெர்னாண்டோ',
-    nic: '198759302190',
-    dob: '1987-09-15',
-    gender: 'FEMALE',
-    address: 'No. 200/4, Negombo Road, Ja-Ela',
-    telephone: '072 444 8877',
-    email: 'anoma.f@lankaprecision.lk',
-    departmentId: 'dept-04',
-    designationId: 'des-05',
-    joinDate: '2019-11-01',
-    employmentStatus: 'PERMANENT',
-    epfNumber: 'EPF-4015',
-    etfNumber: 'ETF-4015',
-    basicSalary: 85000,
-    fixedAllowance: 20000,
-    otherAllowance: 5000,
-    bankName: 'People\'s Bank',
-    bankAccountNumber: '204100140029',
-    branch: 'Ja-Ela (204)',
-    payrollCategoryId: 'cat-01',
-    workingDaysPerMonth: 25,
-    normalWorkingHours: 8,
-    otRateType: '1.5X_STANDARD',
-    fingerprintUserId: '1005',
-    isActive: true
-  }
-];
-
-const initialDevices: FingerprintDevice[] = [
-  {
-    id: 'dev-hikvision-01',
-    name: 'Hikvision Attendance Device',
-    brand: 'Hikvision',
-    model: 'DS-K1A8503MF',
-    ipAddress: '192.168.1.201',
-    port: 80,
-    username: 'admin',
-    password: '',
-    communicationType: 'TCP_IP',
-    status: 'UNTESTED',
-    lastSyncTime: '',
-    serialNumber: ''
-  },
-  {
-    id: 'dev-01',
-    name: 'Main Factory Gate (ZKTeco K40)',
-    brand: 'ZKTeco',
-    model: 'ZKTeco K40 Pro / IN01',
-    ipAddress: '192.168.1.205',
-    port: 4370,
-    communicationType: 'TCP_IP',
-    status: 'UNTESTED',
-    lastSyncTime: '',
-    serialNumber: ''
-  }
-];
-
-const initialAllowanceRules: AllowanceDeductionRule[] = [
+export const defaultAllowanceRules: AllowanceDeductionRule[] = [
   {
     id: 'rule-tiered-customer',
     name: 'Sri Lanka Factory Attendance Incentive Tier Rule',
@@ -279,190 +87,106 @@ const initialAllowanceRules: AllowanceDeductionRule[] = [
     capAtTotalAllowance: true,
     isActive: true,
     isDefault: true
+  },
+  {
+    id: 'rule-daily-prorata',
+    name: 'Pro-Rata Daily Allowance Deduction (Allowance ÷ 25)',
+    description: 'Deducts exact daily proportion of fixed allowance per unpaid day.',
+    ruleType: 'DAILY_PRORATA',
+    tiers: [],
+    capAtTotalAllowance: true,
+    isActive: true,
+    isDefault: false
   }
 ];
 
-const initialLeaveTypes: LeaveType[] = [
+export const defaultLeaveTypes: LeaveType[] = [
   { id: 'lt-01', code: 'ANNUAL', name: 'Annual Leave (Shop & Office)', nameSinhala: 'වාර්ෂික නිවාඩු', nameTamil: 'வருடாந்திர விடுப்பு', isPaid: true, defaultDaysPerYear: 14 },
-  { id: 'lt-02', code: 'CASUAL', name: 'Casual Leave', nameSinhala: 'අනියම් නිවාඩු', nameTamil: 'தற்செயல் விடுப்பு', isPaid: true, defaultDaysPerYear: 7 },
+  { id: 'lt-02', code: 'CASUAL', name: 'Casual Leave', nameSinhala: 'අනියම් නිවාඩු', nameTamil: 'தற்செயල් விடுப்பு', isPaid: true, defaultDaysPerYear: 7 },
   { id: 'lt-03', code: 'MEDICAL', name: 'Medical / Sick Leave', nameSinhala: 'වෛද්‍ය නිවාඩු', nameTamil: 'மருத்துவ விடுப்பு', isPaid: true, defaultDaysPerYear: 14 },
   { id: 'lt-04', code: 'NO_PAY', name: 'Unpaid / No-Pay Leave', nameSinhala: 'වැටුප් රහිත නිවාඩු', nameTamil: 'சம்பளமில்லா விடுப்பு', isPaid: false, defaultDaysPerYear: 0 }
 ];
 
-const initialCategories: PayrollCategory[] = [
+export const defaultCategories: PayrollCategory[] = [
   {
     id: 'cat-01',
-    name: 'Sri Lankan Standard Permanent Staff (25 Working Days, 1.5x OT)',
+    name: 'Sri Lankan Factory Permanent Staff (25 Days Divisor, 1.5x OT)',
     workingDaysDivisor: 25,
     defaultOtMultiplier: 1.5,
     allowanceDeductionRuleId: 'rule-tiered-customer'
+  },
+  {
+    id: 'cat-02',
+    name: 'Executive & Office Staff (25 Days Divisor, Fixed Hourly OT)',
+    workingDaysDivisor: 25,
+    defaultOtMultiplier: 1.5,
+    allowanceDeductionRuleId: 'rule-daily-prorata'
   }
 ];
 
-function generateSampleAttendanceAndPunches(): {
-  punches: RawAttendancePunch[];
-  processed: ProcessedAttendance[];
-} {
-  const punches: RawAttendancePunch[] = [];
-  const processed: ProcessedAttendance[] = [];
+export const defaultDepartments: Department[] = [
+  { id: 'dept-01', code: 'DEP-PROD', name: 'Production & Manufacturing', nameSinhala: 'නිෂ්පාදන අංශය', nameTamil: 'உற்பத்தி பிரிவு' },
+  { id: 'dept-02', code: 'DEP-QC', name: 'Quality Assurance & QC', nameSinhala: 'තත්ත්ව පාලන අංශය', nameTamil: 'தரக் கட்டுப்பாட்டு பிரிவு' },
+  { id: 'dept-03', code: 'DEP-ENG', name: 'Maintenance & Engineering', nameSinhala: 'නඩත්තු අංශය', nameTamil: 'பராமரிப்பு பிரிவு' },
+  { id: 'dept-04', code: 'DEP-HR', name: 'Human Resources & Admin', nameSinhala: 'මානව සම්පත් අංශය', nameTamil: 'மனித வள பிரிவு' },
+  { id: 'dept-05', code: 'DEP-LOG', name: 'Warehouse & Logistics', nameSinhala: 'ගබඩා සහ ප්‍රවාහන අංශය', nameTamil: 'கிடங்கு பிரிவு' }
+];
 
-  const days = 31; // Jan 2026
-  initialEmployees.forEach(emp => {
-    for (let d = 1; d <= days; d++) {
-      const dayStr = d < 10 ? `0${d}` : `${d}`;
-      const dateStr = `2026-01-${dayStr}`;
-      const dateObj = new Date(2026, 0, d);
-      const isSunday = dateObj.getDay() === 0;
-      const isSaturday = dateObj.getDay() === 6;
+export const defaultDesignations: Designation[] = [
+  { id: 'des-01', code: 'DES-OPR', title: 'Machine Operator', departmentId: 'dept-01' },
+  { id: 'des-02', code: 'DES-SUP', title: 'Floor Supervisor', departmentId: 'dept-01' },
+  { id: 'des-03', code: 'DES-QC', title: 'QC Inspector', departmentId: 'dept-02' },
+  { id: 'des-04', code: 'DES-TECH', title: 'Maintenance Technician', departmentId: 'dept-03' },
+  { id: 'des-05', code: 'DES-HRO', title: 'HR Officer', departmentId: 'dept-04' }
+];
 
-      if (isSunday) {
-        processed.push({
-          id: `att-${emp.id}-${dateStr}`,
-          employeeId: emp.id,
-          date: dateStr,
-          totalHours: 0,
-          normalHours: 0,
-          otHours: 0,
-          lateMinutes: 0,
-          earlyLeaveMinutes: 0,
-          status: 'WEEKEND',
-          isManualCorrection: false
-        });
-        continue;
-      }
-
-      // Sample intentional No-Pay day for Emp 1 and Emp 3 to demonstrate tiered allowance deduction
-      if (emp.id === 'emp-01' && (d === 12 || d === 13 || d === 14)) {
-        processed.push({
-          id: `att-${emp.id}-${dateStr}`,
-          employeeId: emp.id,
-          date: dateStr,
-          totalHours: 0,
-          normalHours: 0,
-          otHours: 0,
-          lateMinutes: 0,
-          earlyLeaveMinutes: 0,
-          status: 'NO_PAY',
-          remarks: 'Unapproved absence (No-Pay)',
-          isManualCorrection: false
-        });
-        continue;
-      }
-
-      if (emp.id === 'emp-03' && d === 19) {
-        processed.push({
-          id: `att-${emp.id}-${dateStr}`,
-          employeeId: emp.id,
-          date: dateStr,
-          totalHours: 0,
-          normalHours: 0,
-          otHours: 0,
-          lateMinutes: 0,
-          earlyLeaveMinutes: 0,
-          status: 'NO_PAY',
-          remarks: 'Unpaid Leave (1 day)',
-          isManualCorrection: false
-        });
-        continue;
-      }
-
-      // Normal working punch
-      const inHour = 8;
-      const inMin = (d % 3 === 0) ? 42 : (15 + (d % 10)); // Some late arrivals (after 08:30 + 15 grace = 08:45)
-      const outHour = (d % 2 === 0) ? 19 : 17; // Some OT days
-      const outMin = 10;
-
-      const inTimeStr = `${inHour < 10 ? '0' + inHour : inHour}:${inMin < 10 ? '0' + inMin : inMin}`;
-      const outTimeStr = `${outHour}:${outMin < 10 ? '0' + outMin : outMin}`;
-
-      // Create raw punch in & punch out
-      punches.push({
-        id: `punch-${emp.id}-${dateStr}-IN`,
-        deviceId: 'dev-01',
-        deviceName: 'Main Factory Gate (ZKTeco K40)',
-        deviceUserId: emp.fingerprintUserId,
-        employeeId: emp.id,
-        punchTimestamp: `${dateStr}T${inTimeStr}:00`,
-        punchDate: dateStr,
-        punchTime: `${inTimeStr}:00`,
-        punchType: 'IN',
-        verificationMode: 'FINGERPRINT',
-        isProcessed: true,
-        createdAt: `${dateStr}T${inTimeStr}:00`
-      });
-
-      punches.push({
-        id: `punch-${emp.id}-${dateStr}-OUT`,
-        deviceId: 'dev-01',
-        deviceName: 'Main Factory Gate (ZKTeco K40)',
-        deviceUserId: emp.fingerprintUserId,
-        employeeId: emp.id,
-        punchTimestamp: `${dateStr}T${outTimeStr}:00`,
-        punchDate: dateStr,
-        punchTime: `${outTimeStr}:00`,
-        punchType: 'OUT',
-        verificationMode: 'FINGERPRINT',
-        isProcessed: true,
-        createdAt: `${dateStr}T${outTimeStr}:00`
-      });
-
-      const totalH = outHour - inHour + (outMin - inMin) / 60;
-      const otH = outHour >= 19 ? 2 : 0;
-      const lateM = inMin > 30 ? inMin - 30 : 0;
-
-      processed.push({
-        id: `att-${emp.id}-${dateStr}`,
-        employeeId: emp.id,
-        date: dateStr,
-        firstIn: inTimeStr,
-        lastOut: outTimeStr,
-        totalHours: Math.round(totalH * 10) / 10,
-        normalHours: 8,
-        otHours: otH,
-        lateMinutes: lateM,
-        earlyLeaveMinutes: 0,
-        status: 'PRESENT',
-        isManualCorrection: false
-      });
-    }
-  });
-
-  return { punches, processed };
-}
+export const defaultDevices: FingerprintDevice[] = [
+  {
+    id: 'dev-01',
+    name: 'Main Factory Gate Reader (Hikvision)',
+    brand: 'Hikvision',
+    model: 'DS-K1A8503MF',
+    ipAddress: '192.168.1.201',
+    port: 80,
+    username: 'admin',
+    password: '',
+    communicationType: 'TCP_IP',
+    status: 'UNTESTED',
+    serialNumber: 'DS-K1A8503MF20241015'
+  }
+];
 
 function getInitialDatabase(): DatabaseState {
-  const { punches, processed } = generateSampleAttendanceAndPunches();
-
   const initialAuditLogs: AuditLog[] = [
     {
-      id: 'audit-01',
+      id: `audit-${Date.now()}`,
       timestamp: new Date().toISOString(),
       user: 'Admin',
       userRole: 'Admin',
       action: 'SYSTEM_INIT',
-      details: 'Initialized LankaHR database with Sri Lankan statutory defaults (EPF 8%/12%, ETF 3%, 25 days divisor).'
+      details: 'Clean SQLite database initialized with Sri Lankan statutory framework.'
     }
   ];
 
   return {
-    version: 2,
+    version: 3,
     lastUpdated: new Date().toISOString(),
     companySettings: defaultSettings,
     users: [
       { id: 'usr-01', username: 'admin', fullName: 'System Administrator', role: 'Admin' },
       { id: 'usr-02', username: 'hrmanager', fullName: 'HR Manager', role: 'HR Manager' }
     ],
-    departments: initialDepartments,
-    designations: initialDesignations,
-    employees: initialEmployees,
-    devices: initialDevices,
-    rawPunches: punches,
-    processedAttendance: processed,
-    leaveTypes: initialLeaveTypes,
+    departments: defaultDepartments,
+    designations: defaultDesignations,
+    employees: [],
+    devices: defaultDevices,
+    rawPunches: [],
+    processedAttendance: [],
+    leaveTypes: defaultLeaveTypes,
     employeeLeaves: [],
     incentives: [],
-    allowanceRules: initialAllowanceRules,
-    payrollCategories: initialCategories,
+    allowanceRules: defaultAllowanceRules,
+    payrollCategories: defaultCategories,
     payrollPeriods: [],
     auditLogs: initialAuditLogs
   };
@@ -470,20 +194,70 @@ function getInitialDatabase(): DatabaseState {
 
 export class DatabaseService {
   private static state: DatabaseState = DatabaseService.loadFromStorage();
+  private static isInitialized = false;
+
+  public static async initialize(): Promise<DatabaseState> {
+    if (this.isInitialized) return this.state;
+
+    // Check if running inside Electron desktop with SQLite bridge
+    if (typeof window !== 'undefined' && window.electronAPI?.dbInit) {
+      try {
+        console.log('[DatabaseService] Requesting SQLite database initialization via Electron IPC...');
+        const res = await window.electronAPI.dbInit();
+        if (res.success && res.state && res.state.companySettings) {
+          const loaded = res.state;
+          // Ensure all arrays exist
+          loaded.departments = loaded.departments?.length > 0 ? loaded.departments : defaultDepartments;
+          loaded.designations = loaded.designations?.length > 0 ? loaded.designations : defaultDesignations;
+          loaded.allowanceRules = loaded.allowanceRules?.length > 0 ? loaded.allowanceRules : defaultAllowanceRules;
+          loaded.leaveTypes = loaded.leaveTypes?.length > 0 ? loaded.leaveTypes : defaultLeaveTypes;
+          loaded.payrollCategories = loaded.payrollCategories?.length > 0 ? loaded.payrollCategories : defaultCategories;
+          loaded.employees = loaded.employees || [];
+          loaded.devices = loaded.devices?.length > 0 ? loaded.devices : defaultDevices;
+          loaded.rawPunches = loaded.rawPunches || [];
+          loaded.processedAttendance = loaded.processedAttendance || [];
+          loaded.employeeLeaves = loaded.employeeLeaves || [];
+          loaded.incentives = loaded.incentives || [];
+          loaded.payrollPeriods = loaded.payrollPeriods || [];
+          loaded.auditLogs = loaded.auditLogs || [];
+
+          this.state = loaded as DatabaseState;
+          console.log(`[DatabaseService] SQLite Database ready (${this.state.employees.length} employees).`);
+        } else {
+          console.log('[DatabaseService] SQLite was empty, saving initial defaults...');
+          await window.electronAPI.dbSaveAll(this.state);
+        }
+      } catch (ipcErr) {
+        console.warn('[DatabaseService] SQLite IPC initialization failed, using local cache:', ipcErr);
+      }
+    }
+
+    this.isInitialized = true;
+    return this.state;
+  }
 
   private static loadFromStorage(): DatabaseState {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.employees && parsed.companySettings) {
-          // Ensure all arrays are initialized
-          if (!parsed.incentives) parsed.incentives = [];
-          if (!parsed.employeeLeaves) parsed.employeeLeaves = [];
-          if (!parsed.departments) parsed.departments = initialDepartments;
-          if (!parsed.designations) parsed.designations = initialDesignations;
-          if (!parsed.allowanceRules) parsed.allowanceRules = initialAllowanceRules;
-          return parsed;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.companySettings) {
+            parsed.departments = parsed.departments?.length ? parsed.departments : defaultDepartments;
+            parsed.designations = parsed.designations?.length ? parsed.designations : defaultDesignations;
+            parsed.allowanceRules = parsed.allowanceRules?.length ? parsed.allowanceRules : defaultAllowanceRules;
+            parsed.leaveTypes = parsed.leaveTypes?.length ? parsed.leaveTypes : defaultLeaveTypes;
+            parsed.payrollCategories = parsed.payrollCategories?.length ? parsed.payrollCategories : defaultCategories;
+            parsed.employees = parsed.employees || [];
+            parsed.devices = parsed.devices?.length ? parsed.devices : defaultDevices;
+            parsed.rawPunches = parsed.rawPunches || [];
+            parsed.processedAttendance = parsed.processedAttendance || [];
+            parsed.employeeLeaves = parsed.employeeLeaves || [];
+            parsed.incentives = parsed.incentives || [];
+            parsed.payrollPeriods = parsed.payrollPeriods || [];
+            parsed.auditLogs = parsed.auditLogs || [];
+            return parsed;
+          }
         }
       }
     } catch (err) {
@@ -494,23 +268,32 @@ export class DatabaseService {
     return initial;
   }
 
-  private static saveToStorage(state: DatabaseState): void {
+  public static saveToStorage(state: DatabaseState): void {
     try {
       state.lastUpdated = new Date().toISOString();
       const serialized = JSON.stringify(state);
-      localStorage.setItem(STORAGE_KEY, serialized);
 
-      // Async write to Electron userData if running in Electron
-      if (typeof window !== 'undefined' && (window as any).electronAPI?.writeFile) {
-        try {
-          (window as any).electronAPI.writeFile('lankahr_data.json', serialized).catch(() => {});
-        } catch {
-          // Ignore desktop sync error
-        }
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(STORAGE_KEY, serialized);
+      }
+
+      // Sync directly to SQLite database via Electron IPC
+      if (typeof window !== 'undefined' && window.electronAPI?.dbSaveAll) {
+        window.electronAPI.dbSaveAll(state).then(res => {
+          if (!res.success) {
+            console.error('[DatabaseService] Electron SQLite write error:', res.error);
+          }
+        }).catch(err => {
+          console.error('[DatabaseService] IPC dbSaveAll error:', err);
+        });
       }
     } catch (err) {
-      console.error('Failed to write database to localStorage', err);
+      console.error('[DatabaseService] Failed to persist database:', err);
     }
+  }
+
+  public static getState(): DatabaseState {
+    return this.state;
   }
 
   public static logAudit(action: string, details: string, userRole: string = 'Admin'): void {
@@ -522,8 +305,9 @@ export class DatabaseService {
       action,
       details
     };
+    if (!this.state.auditLogs) this.state.auditLogs = [];
     this.state.auditLogs.unshift(log);
-    if (this.state.auditLogs.length > 200) {
+    if (this.state.auditLogs.length > 300) {
       this.state.auditLogs.pop();
     }
     this.saveToStorage(this.state);
@@ -534,65 +318,120 @@ export class DatabaseService {
     return this.state.companySettings || defaultSettings;
   }
 
-  public static saveSettings(settings: CompanySettings, userRole: string = 'Admin'): void {
+  public static saveSettings(settings: Partial<CompanySettings>, userRole: string = 'Admin'): CompanySettings {
     this.state.companySettings = { ...this.state.companySettings, ...settings };
     this.logAudit('UPDATE_SETTINGS', 'Updated company profile & statutory parameters', userRole);
     this.saveToStorage(this.state);
+    return this.state.companySettings;
   }
 
   // Employees CRUD
   public static getEmployees(): Employee[] {
-    return this.state.employees;
+    return this.state.employees || [];
   }
 
   public static getEmployeeById(id: string): Employee | undefined {
-    return this.state.employees.find(e => e.id === id);
+    return (this.state.employees || []).find(e => e.id === id);
   }
 
-  public static saveEmployee(employee: Partial<Employee>, userRole: string = 'Admin'): Employee {
-    if (employee.id && this.state.employees.some(e => e.id === employee.id)) {
-      const idx = this.state.employees.findIndex(e => e.id === employee.id);
-      this.state.employees[idx] = { ...this.state.employees[idx], ...employee } as Employee;
-      this.logAudit('UPDATE_EMPLOYEE', `Updated employee ${this.state.employees[idx].employeeCode} - ${this.state.employees[idx].fullName}`, userRole);
-      this.saveToStorage(this.state);
-      return this.state.employees[idx];
-    } else {
-      const newEmp: Employee = {
-        id: employee.id || `emp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-        employeeCode: employee.employeeCode || `EMP-${Date.now().toString().slice(-4)}`,
-        fullName: employee.fullName || 'New Employee',
-        nameSinhala: employee.nameSinhala || '',
-        nameTamil: employee.nameTamil || '',
-        nic: employee.nic || '',
-        dob: employee.dob || '1995-01-01',
-        gender: employee.gender || 'MALE',
-        address: employee.address || '',
-        telephone: employee.telephone || '',
-        email: employee.email || '',
-        departmentId: employee.departmentId || (this.state.departments[0]?.id || 'dept-01'),
-        designationId: employee.designationId || (this.state.designations[0]?.id || 'des-01'),
-        joinDate: employee.joinDate || new Date().toISOString().slice(0, 10),
-        employmentStatus: employee.employmentStatus || 'PERMANENT',
-        epfNumber: employee.epfNumber || 'EPF-0000',
-        basicSalary: Number(employee.basicSalary) || 30000,
-        fixedAllowance: Number(employee.fixedAllowance) || 5000,
-        otherAllowance: Number(employee.otherAllowance) || 0,
-        bankName: employee.bankName || 'Bank of Ceylon',
-        bankAccountNumber: employee.bankAccountNumber || '',
-        branch: employee.branch || 'Colombo',
-        payrollCategoryId: employee.payrollCategoryId || 'cat-01',
-        workingDaysPerMonth: Number(employee.workingDaysPerMonth) || 25,
-        normalWorkingHours: Number(employee.normalWorkingHours) || 8,
-        otRateType: employee.otRateType || '1.5X_STANDARD',
-        fingerprintUserId: employee.fingerprintUserId || employee.employeeCode || `${Date.now().toString().slice(-4)}`,
-        isActive: employee.isActive !== undefined ? employee.isActive : true,
-        ...employee
-      };
-      this.state.employees.push(newEmp);
-      this.logAudit('ADD_EMPLOYEE', `Registered employee ${newEmp.employeeCode} - ${newEmp.fullName}`, userRole);
-      this.saveToStorage(this.state);
-      return newEmp;
+  public static saveEmployee(employeeData: Partial<Employee>, userRole: string = 'Admin'): Employee {
+    console.log('[EMPLOYEE_SAVE] FORM_SUBMIT', {
+      employeeCode: employeeData.employeeCode,
+      fullName: employeeData.fullName,
+      basicSalary: employeeData.basicSalary,
+      fixedAllowance: employeeData.fixedAllowance,
+      workingDaysPerMonth: employeeData.workingDaysPerMonth
+    });
+
+    // Validation
+    const code = (employeeData.employeeCode || '').trim();
+    const name = (employeeData.fullName || '').trim();
+
+    if (!code) {
+      console.error('[EMPLOYEE_SAVE] VALIDATION_RESULT: Employee ID / Code is required');
+      throw new Error('Employee Code / ID is required.');
     }
+    if (!name) {
+      console.error('[EMPLOYEE_SAVE] VALIDATION_RESULT: Employee Name is required');
+      throw new Error('Employee Full Name is required.');
+    }
+
+    console.log('[EMPLOYEE_SAVE] VALIDATION_RESULT: Passed');
+    console.log('[EMPLOYEE_SAVE] DATABASE_SAVE_STARTED', { employeeCode: code });
+
+    const existingIdx = employeeData.id
+      ? this.state.employees.findIndex(e => e.id === employeeData.id)
+      : this.state.employees.findIndex(e => e.employeeCode.toLowerCase() === code.toLowerCase());
+
+    let savedEmployee: Employee;
+
+    if (existingIdx !== -1) {
+      const existing = this.state.employees[existingIdx];
+      savedEmployee = {
+        ...existing,
+        ...employeeData,
+        employeeCode: code,
+        fullName: name,
+        epfNumber: employeeData.epfNumber !== undefined ? employeeData.epfNumber : existing.epfNumber,
+        etfNumber: employeeData.etfNumber !== undefined ? employeeData.etfNumber : existing.etfNumber,
+        epfEnabled: employeeData.epfEnabled !== undefined ? employeeData.epfEnabled : (existing.epfEnabled ?? true),
+        etfEnabled: employeeData.etfEnabled !== undefined ? employeeData.etfEnabled : (existing.etfEnabled ?? true),
+        basicSalary: Number(employeeData.basicSalary) >= 0 ? Number(employeeData.basicSalary) : existing.basicSalary,
+        fixedAllowance: Number(employeeData.fixedAllowance) >= 0 ? Number(employeeData.fixedAllowance) : existing.fixedAllowance,
+        otherAllowance: Number(employeeData.otherAllowance) >= 0 ? Number(employeeData.otherAllowance) : (existing.otherAllowance || 0),
+        workingDaysPerMonth: Number(employeeData.workingDaysPerMonth) > 0 ? Number(employeeData.workingDaysPerMonth) : 25,
+        normalWorkingHours: Number(employeeData.normalWorkingHours) > 0 ? Number(employeeData.normalWorkingHours) : 8,
+        fingerprintUserId: employeeData.fingerprintUserId || code,
+        isActive: employeeData.isActive !== undefined ? employeeData.isActive : existing.isActive
+      };
+      this.state.employees[existingIdx] = savedEmployee;
+      this.logAudit('UPDATE_EMPLOYEE', `Updated employee ${code} - ${name}`, userRole);
+    } else {
+      savedEmployee = {
+        id: employeeData.id || `emp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        employeeCode: code,
+        fullName: name,
+        nameSinhala: employeeData.nameSinhala || '',
+        nameTamil: employeeData.nameTamil || '',
+        nic: employeeData.nic || '',
+        dob: employeeData.dob || '1995-01-01',
+        gender: employeeData.gender || 'MALE',
+        address: employeeData.address || '',
+        telephone: employeeData.telephone || '',
+        email: employeeData.email || '',
+        departmentId: employeeData.departmentId || (this.state.departments[0]?.id || 'dept-01'),
+        designationId: employeeData.designationId || (this.state.designations[0]?.id || 'des-01'),
+        joinDate: employeeData.joinDate || new Date().toISOString().slice(0, 10),
+        employmentStatus: employeeData.employmentStatus || 'PERMANENT',
+        epfNumber: employeeData.epfNumber || code,
+        etfNumber: employeeData.etfNumber || '',
+        epfEnabled: employeeData.epfEnabled !== undefined ? employeeData.epfEnabled : true,
+        etfEnabled: employeeData.etfEnabled !== undefined ? employeeData.etfEnabled : true,
+        basicSalary: Number(employeeData.basicSalary) >= 0 ? Number(employeeData.basicSalary) : 30000,
+        fixedAllowance: Number(employeeData.fixedAllowance) >= 0 ? Number(employeeData.fixedAllowance) : 5000,
+        otherAllowance: Number(employeeData.otherAllowance) >= 0 ? Number(employeeData.otherAllowance) : 0,
+        bankName: employeeData.bankName || 'Bank of Ceylon',
+        bankAccountNumber: employeeData.bankAccountNumber || '',
+        branch: employeeData.branch || 'Head Office',
+        payrollCategoryId: employeeData.payrollCategoryId || (this.state.payrollCategories[0]?.id || 'cat-01'),
+        workingDaysPerMonth: Number(employeeData.workingDaysPerMonth) > 0 ? Number(employeeData.workingDaysPerMonth) : 25,
+        normalWorkingHours: Number(employeeData.normalWorkingHours) > 0 ? Number(employeeData.normalWorkingHours) : 8,
+        otRateType: employeeData.otRateType || '1.5X_STANDARD',
+        fingerprintUserId: employeeData.fingerprintUserId || code,
+        isActive: employeeData.isActive !== undefined ? employeeData.isActive : true
+      };
+      this.state.employees.push(savedEmployee);
+      this.logAudit('ADD_EMPLOYEE', `Registered employee ${savedEmployee.employeeCode} - ${savedEmployee.fullName}`, userRole);
+    }
+
+    this.saveToStorage(this.state);
+    console.log('[EMPLOYEE_SAVE] DATABASE_SAVE_SUCCESS', {
+      id: savedEmployee.id,
+      employeeCode: savedEmployee.employeeCode,
+      totalEmployees: this.state.employees.length
+    });
+
+    return savedEmployee;
   }
 
   public static deleteEmployee(id: string, userRole: string = 'Admin'): void {
@@ -604,10 +443,11 @@ export class DatabaseService {
 
   // Departments & Designations CRUD
   public static getDepartments(): Department[] {
-    return this.state.departments || initialDepartments;
+    return this.state.departments || defaultDepartments;
   }
 
   public static saveDepartment(dept: Partial<Department>, userRole: string = 'Admin'): Department {
+    if (!this.state.departments) this.state.departments = [];
     if (dept.id && this.state.departments.some(d => d.id === dept.id)) {
       const idx = this.state.departments.findIndex(d => d.id === dept.id);
       this.state.departments[idx] = { ...this.state.departments[idx], ...dept } as Department;
@@ -641,10 +481,11 @@ export class DatabaseService {
   }
 
   public static getDesignations(): Designation[] {
-    return this.state.designations || initialDesignations;
+    return this.state.designations || defaultDesignations;
   }
 
   public static saveDesignation(desig: Partial<Designation>, userRole: string = 'Admin'): Designation {
+    if (!this.state.designations) this.state.designations = [];
     if (desig.id && this.state.designations.some(d => d.id === desig.id)) {
       const idx = this.state.designations.findIndex(d => d.id === desig.id);
       this.state.designations[idx] = { ...this.state.designations[idx], ...desig } as Designation;
@@ -678,10 +519,11 @@ export class DatabaseService {
 
   // Biometric Devices
   public static getDevices(): FingerprintDevice[] {
-    return this.state.devices;
+    return this.state.devices || [];
   }
 
   public static saveDevice(device: Partial<FingerprintDevice>, userRole: string = 'Admin'): FingerprintDevice {
+    if (!this.state.devices) this.state.devices = [];
     if (device.id && this.state.devices.some(d => d.id === device.id)) {
       const idx = this.state.devices.findIndex(d => d.id === device.id);
       this.state.devices[idx] = { ...this.state.devices[idx], ...device } as FingerprintDevice;
@@ -691,7 +533,7 @@ export class DatabaseService {
     } else {
       const newDev: FingerprintDevice = {
         id: device.id || `dev-${Date.now()}`,
-        name: device.name || 'Hikvision Attendance Device',
+        name: device.name || 'Hikvision Attendance Terminal',
         brand: device.brand || 'Hikvision',
         model: device.model || 'DS-K1A8503MF',
         ipAddress: device.ipAddress || '192.168.1.201',
@@ -701,7 +543,7 @@ export class DatabaseService {
         communicationType: device.communicationType || 'TCP_IP',
         status: device.status || 'UNTESTED',
         lastSyncTime: new Date().toISOString().slice(0, 16).replace('T', ' '),
-        serialNumber: device.serialNumber || '',
+        serialNumber: device.serialNumber || 'DS-K1A8503MF20241015',
         ...device
       };
       this.state.devices.push(newDev);
@@ -712,22 +554,23 @@ export class DatabaseService {
   }
 
   public static deleteDevice(id: string, userRole: string = 'Admin'): void {
-    this.state.devices = this.state.devices.filter(d => d.id !== id);
+    this.state.devices = (this.state.devices || []).filter(d => d.id !== id);
     this.logAudit('DELETE_DEVICE', `Removed device ${id}`, userRole);
     this.saveToStorage(this.state);
   }
 
-  // Raw Biometric Attendance Punches
+  // Raw Punches
   public static getRawPunches(): RawAttendancePunch[] {
-    return this.state.rawPunches;
+    return this.state.rawPunches || [];
   }
 
   public static saveRawPunches(punches: RawAttendancePunch[], userRole: string = 'Admin'): void {
+    if (!this.state.rawPunches) this.state.rawPunches = [];
     const existingKeys = new Set(
-      this.state.rawPunches.map(p => `${p.deviceId}_${p.deviceUserId}_${p.punchTimestamp}`)
+      this.state.rawPunches.map(p => `${p.deviceId}_${p.deviceUserId}_${p.punchTimestamp}_${p.punchType}`)
     );
     const newPunches = punches.filter(
-      p => !existingKeys.has(`${p.deviceId}_${p.deviceUserId}_${p.punchTimestamp}`)
+      p => !existingKeys.has(`${p.deviceId}_${p.deviceUserId}_${p.punchTimestamp}_${p.punchType}`)
     );
     this.state.rawPunches.push(...newPunches);
     this.logAudit('DOWNLOAD_PUNCHES', `Downloaded ${newPunches.length} raw punches from biometric terminal.`, userRole);
@@ -736,11 +579,13 @@ export class DatabaseService {
 
   // Processed Attendance
   public static getProcessedAttendance(month?: string): ProcessedAttendance[] {
-    if (!month) return this.state.processedAttendance;
-    return this.state.processedAttendance.filter(a => a.date.startsWith(month));
+    const list = this.state.processedAttendance || [];
+    if (!month) return list;
+    return list.filter(a => a.date.startsWith(month));
   }
 
   public static saveProcessedAttendanceBatch(records: ProcessedAttendance[], userRole: string = 'Admin'): void {
+    if (!this.state.processedAttendance) this.state.processedAttendance = [];
     const map = new Map(this.state.processedAttendance.map(a => [a.id, a]));
     records.forEach(r => map.set(r.id, r));
     this.state.processedAttendance = Array.from(map.values());
@@ -749,6 +594,7 @@ export class DatabaseService {
   }
 
   public static saveManualAttendance(record: Partial<ProcessedAttendance>, userRole: string = 'Admin'): ProcessedAttendance {
+    if (!this.state.processedAttendance) this.state.processedAttendance = [];
     const existingIdx = record.id ? this.state.processedAttendance.findIndex(a => a.id === record.id) : -1;
     if (existingIdx !== -1) {
       this.state.processedAttendance[existingIdx] = {
@@ -783,32 +629,15 @@ export class DatabaseService {
     }
   }
 
-  public static updateAttendanceRecord(
-    id: string,
-    updates: Partial<ProcessedAttendance>,
-    userRole: string = 'Admin'
-  ): ProcessedAttendance {
-    const idx = this.state.processedAttendance.findIndex(a => a.id === id);
-    if (idx === -1) throw new Error('Attendance record not found');
-    this.state.processedAttendance[idx] = {
-      ...this.state.processedAttendance[idx],
-      ...updates,
-      isManualCorrection: true
-    };
-    this.logAudit('CORRECT_ATTENDANCE', `Manual attendance correction on record ${id}`, userRole);
-    this.saveToStorage(this.state);
-    return this.state.processedAttendance[idx];
-  }
-
   public static deleteAttendanceRecord(id: string, userRole: string = 'Admin'): void {
-    this.state.processedAttendance = this.state.processedAttendance.filter(a => a.id !== id);
+    this.state.processedAttendance = (this.state.processedAttendance || []).filter(a => a.id !== id);
     this.logAudit('DELETE_ATTENDANCE', `Deleted attendance entry ${id}`, userRole);
     this.saveToStorage(this.state);
   }
 
   // Leave Management
   public static getLeaveTypes(): LeaveType[] {
-    return this.state.leaveTypes;
+    return this.state.leaveTypes || defaultLeaveTypes;
   }
 
   public static getLeaves(): EmployeeLeave[] {
@@ -816,6 +645,7 @@ export class DatabaseService {
   }
 
   public static saveLeave(leave: Omit<EmployeeLeave, 'id'> | EmployeeLeave, userRole: string = 'Admin'): EmployeeLeave {
+    if (!this.state.employeeLeaves) this.state.employeeLeaves = [];
     const existingId = (leave as EmployeeLeave).id;
     if (existingId && this.state.employeeLeaves.some(l => l.id === existingId)) {
       const idx = this.state.employeeLeaves.findIndex(l => l.id === existingId);
@@ -841,6 +671,7 @@ export class DatabaseService {
     approvedBy: string,
     userRole: string = 'Admin'
   ): void {
+    if (!this.state.employeeLeaves) this.state.employeeLeaves = [];
     const idx = this.state.employeeLeaves.findIndex(l => l.id === id);
     if (idx !== -1) {
       this.state.employeeLeaves[idx].status = status;
@@ -851,7 +682,7 @@ export class DatabaseService {
   }
 
   public static deleteLeave(id: string, userRole: string = 'Admin'): void {
-    this.state.employeeLeaves = this.state.employeeLeaves.filter(l => l.id !== id);
+    this.state.employeeLeaves = (this.state.employeeLeaves || []).filter(l => l.id !== id);
     this.logAudit('DELETE_LEAVE', `Deleted leave application ${id}`, userRole);
     this.saveToStorage(this.state);
   }
@@ -861,6 +692,13 @@ export class DatabaseService {
     const list = this.state.incentives || [];
     if (!month) return list;
     return list.filter(i => i.payrollMonth === month);
+  }
+
+  public static getIncentiveTotalForEmployee(employeeId: string, month: string): number {
+    const records = (this.state.incentives || []).filter(
+      i => i.employeeId === employeeId && i.payrollMonth === month
+    );
+    return records.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
   }
 
   public static saveIncentive(incentive: Partial<IncentiveRecord>, userRole: string = 'Admin'): IncentiveRecord {
@@ -892,18 +730,18 @@ export class DatabaseService {
   }
 
   public static deleteIncentive(id: string, userRole: string = 'Admin'): void {
-    if (!this.state.incentives) this.state.incentives = [];
-    this.state.incentives = this.state.incentives.filter(i => i.id !== id);
+    this.state.incentives = (this.state.incentives || []).filter(i => i.id !== id);
     this.logAudit('DELETE_INCENTIVE', `Removed incentive ${id}`, userRole);
     this.saveToStorage(this.state);
   }
 
-  // Allowance Deduction Rules
+  // Allowance Rules
   public static getAllowanceRules(): AllowanceDeductionRule[] {
-    return this.state.allowanceRules;
+    return this.state.allowanceRules || defaultAllowanceRules;
   }
 
   public static saveAllowanceRule(rule: AllowanceDeductionRule, userRole: string = 'Admin'): void {
+    if (!this.state.allowanceRules) this.state.allowanceRules = [];
     const idx = this.state.allowanceRules.findIndex(r => r.id === rule.id);
     if (idx !== -1) {
       this.state.allowanceRules[idx] = rule;
@@ -914,21 +752,81 @@ export class DatabaseService {
     this.saveToStorage(this.state);
   }
 
-  // Payroll Categories
+  // Payroll Categories CRUD
   public static getPayrollCategories(): PayrollCategory[] {
-    return this.state.payrollCategories;
+    return this.state.payrollCategories || defaultCategories;
   }
 
-  // Payroll Period & Master Salary Sheet
+  public static savePayrollCategory(categoryData: Partial<PayrollCategory>, userRole: string = 'Admin'): PayrollCategory {
+    if (!this.state.payrollCategories) this.state.payrollCategories = [...defaultCategories];
+    const name = (categoryData.name || '').trim();
+    if (!name) {
+      throw new Error('Payroll Category Name is required.');
+    }
+
+    const divisor = Number(categoryData.workingDaysDivisor) > 0 ? Number(categoryData.workingDaysDivisor) : 25;
+    const otMult = Number(categoryData.defaultOtMultiplier) > 0 ? Number(categoryData.defaultOtMultiplier) : 1.5;
+    const ruleId = categoryData.allowanceDeductionRuleId || (this.state.allowanceRules[0]?.id || 'rule-tiered-customer');
+
+    let savedCat: PayrollCategory;
+    if (categoryData.id && this.state.payrollCategories.some(c => c.id === categoryData.id)) {
+      const idx = this.state.payrollCategories.findIndex(c => c.id === categoryData.id);
+      savedCat = {
+        ...this.state.payrollCategories[idx],
+        ...categoryData,
+        name,
+        workingDaysDivisor: divisor,
+        defaultOtMultiplier: otMult,
+        allowanceDeductionRuleId: ruleId
+      };
+      this.state.payrollCategories[idx] = savedCat;
+      this.logAudit('UPDATE_PAYROLL_CATEGORY', `Updated payroll category ${name}`, userRole);
+    } else {
+      savedCat = {
+        id: categoryData.id || `cat-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        name,
+        code: categoryData.code || `CAT-0${this.state.payrollCategories.length + 1}`,
+        description: categoryData.description || '',
+        workingDaysDivisor: divisor,
+        defaultOtMultiplier: otMult,
+        allowanceDeductionRuleId: ruleId,
+        epfRateEmployee: categoryData.epfRateEmployee !== undefined ? Number(categoryData.epfRateEmployee) : undefined,
+        epfRateEmployer: categoryData.epfRateEmployer !== undefined ? Number(categoryData.epfRateEmployer) : undefined,
+        etfRateEmployer: categoryData.etfRateEmployer !== undefined ? Number(categoryData.etfRateEmployer) : undefined
+      };
+      this.state.payrollCategories.push(savedCat);
+      this.logAudit('ADD_PAYROLL_CATEGORY', `Created payroll category ${name} (${divisor} working days)`, userRole);
+    }
+    this.saveToStorage(this.state);
+    return savedCat;
+  }
+
+  public static deletePayrollCategory(id: string, userRole: string = 'Admin'): { success: boolean; message?: string } {
+    if (!this.state.payrollCategories) this.state.payrollCategories = [...defaultCategories];
+    const hasAssigned = (this.state.employees || []).some(e => e.payrollCategoryId === id);
+    if (hasAssigned) {
+      return { success: false, message: 'Cannot delete category: Employees are currently assigned to this payroll category.' };
+    }
+    if (this.state.payrollCategories.length <= 1) {
+      return { success: false, message: 'Cannot delete the only remaining payroll category.' };
+    }
+    this.state.payrollCategories = this.state.payrollCategories.filter(c => c.id !== id);
+    this.logAudit('DELETE_PAYROLL_CATEGORY', `Deleted payroll category ${id}`, userRole);
+    this.saveToStorage(this.state);
+    return { success: true };
+  }
+
+  // Payroll Periods
   public static getPayrollPeriods(): PayrollPeriod[] {
-    return this.state.payrollPeriods;
+    return this.state.payrollPeriods || [];
   }
 
   public static getPayrollPeriod(month: string): PayrollPeriod | undefined {
-    return this.state.payrollPeriods.find(p => (p.monthYear === month || p.month === month));
+    return (this.state.payrollPeriods || []).find(p => (p.monthYear === month || p.month === month));
   }
 
   public static savePayrollPeriod(period: PayrollPeriod, userRole: string = 'Admin'): void {
+    if (!this.state.payrollPeriods) this.state.payrollPeriods = [];
     const monthKey = period.monthYear || period.month;
     const idx = this.state.payrollPeriods.findIndex(
       p => (p.monthYear === monthKey || p.month === monthKey)
@@ -944,32 +842,218 @@ export class DatabaseService {
 
   // Audit Trail
   public static getAuditLogs(): AuditLog[] {
-    return this.state.auditLogs;
+    return this.state.auditLogs || [];
   }
 
   // Backup & Restore
   public static backupDatabase(): string {
-    this.logAudit('BACKUP_DATABASE', 'Generated local encrypted database backup file.');
+    this.logAudit('BACKUP_DATABASE', 'Generated local database backup snapshot.');
     return JSON.stringify(this.state, null, 2);
   }
 
   public static restoreDatabase(jsonString: string): { success: boolean; message: string } {
     try {
       const parsed = JSON.parse(jsonString) as DatabaseState;
-      if (!parsed.employees || !parsed.companySettings) {
-        return { success: false, message: 'Invalid backup file structure.' };
+      if (!parsed.companySettings) {
+        return { success: false, message: 'Invalid backup file structure. Missing companySettings.' };
       }
-      this.state = parsed;
+      this.state = {
+        version: parsed.version || 3,
+        lastUpdated: new Date().toISOString(),
+        companySettings: parsed.companySettings,
+        users: parsed.users || [],
+        departments: parsed.departments || defaultDepartments,
+        designations: parsed.designations || defaultDesignations,
+        employees: parsed.employees || [],
+        devices: parsed.devices || defaultDevices,
+        rawPunches: parsed.rawPunches || [],
+        processedAttendance: parsed.processedAttendance || [],
+        leaveTypes: parsed.leaveTypes || defaultLeaveTypes,
+        employeeLeaves: parsed.employeeLeaves || [],
+        incentives: parsed.incentives || [],
+        allowanceRules: parsed.allowanceRules || defaultAllowanceRules,
+        payrollCategories: parsed.payrollCategories || defaultCategories,
+        payrollPeriods: parsed.payrollPeriods || [],
+        auditLogs: parsed.auditLogs || []
+      };
       this.saveToStorage(this.state);
-      this.logAudit('RESTORE_DATABASE', 'Successfully restored complete database from backup file.');
-      return { success: true, message: 'Restored successfully.' };
+      this.logAudit('RESTORE_DATABASE', `Restored database (${this.state.employees.length} employees, ${this.state.payrollPeriods.length} payroll periods).`);
+      return { success: true, message: `Successfully restored ${this.state.employees.length} employees and related records.` };
     } catch (err: any) {
       return { success: false, message: err.message };
     }
   }
 
-  public static resetToSampleData(): void {
+  public static resetToCleanDatabase(userRole: string = 'Admin'): void {
     this.state = getInitialDatabase();
+    this.logAudit('DATABASE_RESET', 'Cleared all application records and initialized empty production database.', userRole);
+    this.saveToStorage(this.state);
+    if (typeof window !== 'undefined' && window.electronAPI?.dbClear) {
+      window.electronAPI.dbClear().catch(() => {});
+    }
+  }
+
+  public static loadSampleDataset(userRole: string = 'Admin'): void {
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const curMonth = todayStr.substring(0, 7);
+
+    const sampleEmployees: Employee[] = [
+      {
+        id: 'emp-test-01',
+        employeeCode: 'TEST001',
+        fullName: 'Kamal Bandara',
+        nameSinhala: 'කමල් බණ්ඩාර',
+        nameTamil: 'கமல் பண்டார',
+        nic: '198812400921',
+        dob: '1988-05-12',
+        gender: 'MALE',
+        address: 'No. 24, Temple Road, Kalutara, Sri Lanka',
+        telephone: '+94 77 123 4567',
+        email: 'kamal.b@lankamanufacturing.lk',
+        departmentId: 'dept-01',
+        designationId: 'des-01',
+        joinDate: '2023-01-15',
+        employmentStatus: 'PERMANENT',
+        epfNumber: 'EPF-1001',
+        basicSalary: 30000,
+        fixedAllowance: 5000,
+        otherAllowance: 0,
+        bankName: 'Bank of Ceylon',
+        bankAccountNumber: '0089124578',
+        branch: 'Kalutara South',
+        payrollCategoryId: 'cat-01',
+        workingDaysPerMonth: 25,
+        normalWorkingHours: 8,
+        otRateType: '1.5X_STANDARD',
+        fingerprintUserId: 'TEST001',
+        isActive: true
+      },
+      {
+        id: 'emp-test-02',
+        employeeCode: 'TEST002',
+        fullName: 'Nimal Perera',
+        nameSinhala: 'නිමල් පෙරේරා',
+        nameTamil: 'நிமல் பெரேரா',
+        nic: '199245100342',
+        dob: '1992-08-20',
+        gender: 'MALE',
+        address: 'No. 112, Kandy Road, Kiribathgoda',
+        telephone: '+94 71 890 1234',
+        email: 'nimal.p@lankamanufacturing.lk',
+        departmentId: 'dept-01',
+        designationId: 'des-02',
+        joinDate: '2022-06-01',
+        employmentStatus: 'PERMANENT',
+        epfNumber: 'EPF-1002',
+        basicSalary: 35000,
+        fixedAllowance: 6000,
+        otherAllowance: 0,
+        bankName: 'Commercial Bank of Ceylon',
+        bankAccountNumber: '1004589214',
+        branch: 'Kiribathgoda',
+        payrollCategoryId: 'cat-01',
+        workingDaysPerMonth: 25,
+        normalWorkingHours: 8,
+        otRateType: '1.5X_STANDARD',
+        fingerprintUserId: 'TEST002',
+        isActive: true
+      },
+      {
+        id: 'emp-test-03',
+        employeeCode: 'TEST003',
+        fullName: 'Sunil Jayawardena',
+        nameSinhala: 'සුනිල් ජයවර්ධන',
+        nameTamil: 'சுனில் ஜெயவர்தன',
+        nic: '199078200119',
+        dob: '1990-11-04',
+        gender: 'MALE',
+        address: 'No. 58, Galle Road, Moratuwa',
+        telephone: '+94 76 345 6789',
+        email: 'sunil.j@lankamanufacturing.lk',
+        departmentId: 'dept-02',
+        designationId: 'des-03',
+        joinDate: '2023-04-10',
+        employmentStatus: 'PERMANENT',
+        epfNumber: 'EPF-1003',
+        basicSalary: 32000,
+        fixedAllowance: 5000,
+        otherAllowance: 0,
+        bankName: 'Hatton National Bank',
+        bankAccountNumber: '0981245671',
+        branch: 'Moratuwa',
+        payrollCategoryId: 'cat-01',
+        workingDaysPerMonth: 25,
+        normalWorkingHours: 8,
+        otRateType: '1.5X_STANDARD',
+        fingerprintUserId: 'TEST003',
+        isActive: true
+      },
+      {
+        id: 'emp-test-04',
+        employeeCode: 'TEST004',
+        fullName: 'Anusha Fernando',
+        nameSinhala: 'අනුෂා ප්‍රනාන්දු',
+        nameTamil: 'அனுஷா பெர்னாண்டோ',
+        nic: '199462300451',
+        dob: '1994-03-18',
+        gender: 'FEMALE',
+        address: 'No. 15, Negombo Road, Ja-Ela',
+        telephone: '+94 72 456 7890',
+        email: 'anusha.f@lankamanufacturing.lk',
+        departmentId: 'dept-04',
+        designationId: 'des-05',
+        joinDate: '2023-08-01',
+        employmentStatus: 'PERMANENT',
+        epfNumber: 'EPF-1004',
+        basicSalary: 40000,
+        fixedAllowance: 8000,
+        otherAllowance: 0,
+        bankName: 'People\'s Bank',
+        bankAccountNumber: '2045891234',
+        branch: 'Ja-Ela',
+        payrollCategoryId: 'cat-02',
+        workingDaysPerMonth: 25,
+        normalWorkingHours: 8,
+        otRateType: '1.5X_STANDARD',
+        fingerprintUserId: 'TEST004',
+        isActive: true
+      }
+    ];
+
+    const sampleIncentives: IncentiveRecord[] = [
+      {
+        id: 'inc-01',
+        employeeId: 'emp-test-01',
+        payrollMonth: curMonth,
+        type: 'PRODUCTION',
+        targetAmount: 5000,
+        achievementAmount: 5500,
+        amount: 3500,
+        description: 'Monthly Factory Unit Output Target Exceeded (+10%)',
+        remarks: 'Approved by Plant Manager',
+        date: todayStr
+      },
+      {
+        id: 'inc-02',
+        employeeId: 'emp-test-02',
+        payrollMonth: curMonth,
+        type: 'ATTENDANCE',
+        targetAmount: 25,
+        achievementAmount: 25,
+        amount: 2000,
+        description: 'Full Monthly Attendance Bonus',
+        remarks: 'Zero unplanned absence in first half',
+        date: todayStr
+      }
+    ];
+
+    this.state = {
+      ...this.state,
+      employees: sampleEmployees,
+      incentives: sampleIncentives
+    };
+
+    this.logAudit('LOAD_SAMPLE_DATA', 'Loaded 4 Sri Lankan test employees and incentives for workflow verification.', userRole);
     this.saveToStorage(this.state);
   }
 }

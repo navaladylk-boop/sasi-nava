@@ -89,6 +89,8 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
       employmentStatus: 'PERMANENT',
       epfNumber: `${1040 + employees.length + 1}`,
       etfNumber: `${1040 + employees.length + 1}`,
+      epfEnabled: true,
+      etfEnabled: true,
       basicSalary: 30000,
       fixedAllowance: 5000,
       otherAllowance: 0,
@@ -141,6 +143,9 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
       workingDaysPerMonth: Number(editingEmployee.workingDaysPerMonth) || 25,
       normalWorkingHours: Number(editingEmployee.normalWorkingHours) || 8,
       epfNumber: editingEmployee.epfNumber || code,
+      etfNumber: editingEmployee.etfNumber || code,
+      epfEnabled: editingEmployee.epfEnabled !== false,
+      etfEnabled: editingEmployee.etfEnabled !== false,
       fingerprintUserId: editingEmployee.fingerprintUserId || code,
       departmentId: editingEmployee.departmentId || departments[0]?.id || '',
       designationId: editingEmployee.designationId || designations[0]?.id || '',
@@ -260,7 +265,7 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
 
       {/* Printable Heading (for window.print) */}
       <div className="hidden print-only mb-4 text-black">
-        <h2 className="text-lg font-bold">Lanka Precision Industries (Pvt) Ltd - Employee Directory</h2>
+        <h2 className="text-lg font-bold">Employee Directory</h2>
         <p className="text-xs text-gray-600">Generated on {new Date().toLocaleDateString('en-GB')} | Total: {filteredEmployees.length}</p>
       </div>
 
@@ -303,7 +308,26 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
                     </td>
                     <td className="py-3 px-3 text-[#374151]">
                       <div>NIC: <span className="font-mono text-[#111827]">{emp.nic}</span></div>
-                      <div className="text-[11px] text-[#6b7280]">EPF: <span className="font-mono text-emerald-700 font-semibold">{emp.epfNumber}</span></div>
+                      <div className="flex flex-wrap items-center gap-1 mt-1">
+                        {emp.epfEnabled !== false ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200" title="EPF 8% + 12% Active">
+                            EPF: {emp.epfNumber}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500 border border-gray-200" title="EPF Disabled">
+                            EPF: Off
+                          </span>
+                        )}
+                        {emp.etfEnabled !== false ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-[#005a9e] border border-blue-200" title="ETF 3% Employer Active">
+                            ETF: 3%
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500 border border-gray-200" title="ETF Disabled">
+                            ETF: Off
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-3 px-3 text-[#374151]">
                       <div className="font-medium text-[#111827]">{getDeptName(emp.departmentId)}</div>
@@ -569,88 +593,183 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
               )}
 
               {activeModalTab === 'salary' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[#4b5563] mb-1 font-medium">{t.basicSalary} *</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-[#9ca3af]">Rs.</span>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        value={editingEmployee.basicSalary || 0}
-                        onChange={e => setEditingEmployee({ ...editingEmployee, basicSalary: Number(e.target.value) })}
-                        className="w-full bg-white border border-[#d1d5db] rounded-lg pl-9 pr-3 py-2 text-[#111827] font-mono font-bold focus:border-[#005a9e] focus:outline-none"
-                      />
+                <div className="space-y-4">
+                  {/* Basic & Allowances */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[#4b5563] mb-1 font-medium">{t.basicSalary} *</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-[#9ca3af]">Rs.</span>
+                        <input
+                          type="number"
+                          required
+                          min="0"
+                          value={editingEmployee.basicSalary || 0}
+                          onChange={e => setEditingEmployee({ ...editingEmployee, basicSalary: Number(e.target.value) })}
+                          className="w-full bg-white border border-[#d1d5db] rounded-lg pl-9 pr-3 py-2 text-[#111827] font-mono font-bold focus:border-[#005a9e] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[#4b5563] mb-1 font-medium">{t.fixedAllowance} (Subject to Deduction)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-[#9ca3af]">Rs.</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={editingEmployee.fixedAllowance || 0}
+                          onChange={e => setEditingEmployee({ ...editingEmployee, fixedAllowance: Number(e.target.value) })}
+                          className="w-full bg-white border border-[#d1d5db] rounded-lg pl-9 pr-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[#4b5563] mb-1 font-medium">{t.otherAllowance}</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-[#9ca3af]">Rs.</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={editingEmployee.otherAllowance || 0}
+                          onChange={e => setEditingEmployee({ ...editingEmployee, otherAllowance: Number(e.target.value) })}
+                          className="w-full bg-white border border-[#d1d5db] rounded-lg pl-9 pr-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[#4b5563] mb-1 font-medium">{t.fixedAllowance} (Subject to Special Deduction)</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-[#9ca3af]">Rs.</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={editingEmployee.fixedAllowance || 0}
-                        onChange={e => setEditingEmployee({ ...editingEmployee, fixedAllowance: Number(e.target.value) })}
-                        className="w-full bg-white border border-[#d1d5db] rounded-lg pl-9 pr-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
-                      />
+                  {/* Sri Lankan Statutory Contributions (EPF & ETF Enable / Disable) */}
+                  <div className="border border-[#e2e8f0] rounded-xl p-4 bg-[#f8fafc] space-y-4">
+                    <div className="flex items-center justify-between border-b border-[#e2e8f0] pb-2">
+                      <h4 className="font-bold text-[#1e293b] text-xs flex items-center gap-1.5">
+                        <Landmark className="w-4 h-4 text-[#005a9e]" />
+                        Sri Lankan Statutory Contributions (EPF & ETF)
+                      </h4>
+                      <span className="text-[10px] text-[#64748b]">
+                        Enable or disable EPF/ETF per employee profile
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* EPF Box */}
+                      <div className={`p-3.5 rounded-lg border transition-colors ${
+                        editingEmployee.epfEnabled !== false
+                          ? 'bg-emerald-50/60 border-emerald-200'
+                          : 'bg-gray-50 border-gray-200 opacity-75'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-xs text-[#0f172a] flex items-center gap-1.5">
+                            Employees' Provident Fund (EPF)
+                          </span>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editingEmployee.epfEnabled !== false}
+                              onChange={e => setEditingEmployee({ ...editingEmployee, epfEnabled: e.target.checked })}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                            <span className="ml-2 text-[11px] font-semibold text-[#334155]">
+                              {editingEmployee.epfEnabled !== false ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </label>
+                        </div>
+
+                        <div>
+                          <label className="block text-[#475569] text-[11px] mb-1 font-medium">EPF Member Number {editingEmployee.epfEnabled !== false && '*'}</label>
+                          <input
+                            type="text"
+                            disabled={editingEmployee.epfEnabled === false}
+                            required={editingEmployee.epfEnabled !== false}
+                            placeholder="e.g. 1042"
+                            value={editingEmployee.epfNumber || ''}
+                            onChange={e => setEditingEmployee({ ...editingEmployee, epfNumber: e.target.value })}
+                            className="w-full bg-white border border-[#cbd5e1] rounded-lg px-3 py-1.5 text-xs text-[#111827] font-mono font-semibold focus:border-[#005a9e] focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                          />
+                          <p className="text-[10px] text-[#64748b] mt-1">
+                            {editingEmployee.epfEnabled !== false
+                              ? 'Deducts 8% Employee EPF and contributes 12% Employer EPF.'
+                              : 'EPF deductions and employer contributions are disabled (0%).'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* ETF Box */}
+                      <div className={`p-3.5 rounded-lg border transition-colors ${
+                        editingEmployee.etfEnabled !== false
+                          ? 'bg-blue-50/60 border-blue-200'
+                          : 'bg-gray-50 border-gray-200 opacity-75'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-xs text-[#0f172a] flex items-center gap-1.5">
+                            Employees' Trust Fund (ETF)
+                          </span>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editingEmployee.etfEnabled !== false}
+                              onChange={e => setEditingEmployee({ ...editingEmployee, etfEnabled: e.target.checked })}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#005a9e]"></div>
+                            <span className="ml-2 text-[11px] font-semibold text-[#334155]">
+                              {editingEmployee.etfEnabled !== false ? 'Enabled' : 'Disabled'}
+                            </span>
+                          </label>
+                        </div>
+
+                        <div>
+                          <label className="block text-[#475569] text-[11px] mb-1 font-medium">ETF Member Number</label>
+                          <input
+                            type="text"
+                            disabled={editingEmployee.etfEnabled === false}
+                            placeholder="e.g. 1042"
+                            value={editingEmployee.etfNumber || editingEmployee.epfNumber || ''}
+                            onChange={e => setEditingEmployee({ ...editingEmployee, etfNumber: e.target.value })}
+                            className="w-full bg-white border border-[#cbd5e1] rounded-lg px-3 py-1.5 text-xs text-[#111827] font-mono font-semibold focus:border-[#005a9e] focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                          />
+                          <p className="text-[10px] text-[#64748b] mt-1">
+                            {editingEmployee.etfEnabled !== false
+                              ? 'Contributes 3% Employer ETF on liable earnings.'
+                              : 'Employer 3% ETF contribution is disabled (0%).'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[#4b5563] mb-1 font-medium">{t.otherAllowance}</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-[#9ca3af]">Rs.</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={editingEmployee.otherAllowance || 0}
-                        onChange={e => setEditingEmployee({ ...editingEmployee, otherAllowance: Number(e.target.value) })}
-                        className="w-full bg-white border border-[#d1d5db] rounded-lg pl-9 pr-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
-                      />
+                  {/* Payroll Category & OT */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[#4b5563] mb-1 font-medium">{t.payrollCategory}</label>
+                      <select
+                        value={editingEmployee.payrollCategoryId || ''}
+                        onChange={e => setEditingEmployee({ ...editingEmployee, payrollCategoryId: e.target.value })}
+                        className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] focus:border-[#005a9e] focus:outline-none"
+                      >
+                        {payrollCategories.map(cat => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name} ({cat.workingDaysDivisor} days divisor)
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-[#6b7280] mt-1">Defines divisor (25 days), default OT rates & deduction rules.</p>
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="block text-[#4b5563] mb-1 font-medium">{t.epfNumber} *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. 1042"
-                      value={editingEmployee.epfNumber || ''}
-                      onChange={e => setEditingEmployee({ ...editingEmployee, epfNumber: e.target.value })}
-                      className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono font-semibold focus:border-[#005a9e] focus:outline-none text-emerald-700"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[#4b5563] mb-1 font-medium">{t.payrollCategory}</label>
-                    <select
-                      value={editingEmployee.payrollCategoryId || ''}
-                      onChange={e => setEditingEmployee({ ...editingEmployee, payrollCategoryId: e.target.value })}
-                      className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] focus:border-[#005a9e] focus:outline-none"
-                    >
-                      {payrollCategories.map(cat => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name} ({cat.workingDaysDivisor} days)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[#4b5563] mb-1 font-medium">{t.otRateConfig}</label>
-                    <select
-                      value={editingEmployee.otRateType || '1.5X_STANDARD'}
-                      onChange={e => setEditingEmployee({ ...editingEmployee, otRateType: e.target.value as any })}
-                      className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] focus:border-[#005a9e] focus:outline-none"
-                    >
-                      <option value="1.5X_STANDARD">Standard 1.5x Hourly Rate</option>
-                      <option value="2.0X_HOLIDAY">Double Rate (2.0x)</option>
-                      <option value="FIXED_HOURLY">Custom Fixed Hourly Rate</option>
-                    </select>
+                    <div>
+                      <label className="block text-[#4b5563] mb-1 font-medium">{t.otRateConfig}</label>
+                      <select
+                        value={editingEmployee.otRateType || '1.5X_STANDARD'}
+                        onChange={e => setEditingEmployee({ ...editingEmployee, otRateType: e.target.value as any })}
+                        className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] focus:border-[#005a9e] focus:outline-none"
+                      >
+                        <option value="1.5X_STANDARD">Standard 1.5x Hourly Rate</option>
+                        <option value="2.0X_HOLIDAY">Double Rate (2.0x)</option>
+                        <option value="FIXED_HOURLY">Custom Fixed Hourly Rate</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               )}

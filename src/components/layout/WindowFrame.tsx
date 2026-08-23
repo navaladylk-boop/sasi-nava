@@ -53,6 +53,27 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
     return () => clearInterval(interval);
   }, []);
 
+  const handleMinimize = () => {
+    if (typeof window !== 'undefined' && window.electronAPI?.minimizeWindow) {
+      window.electronAPI.minimizeWindow();
+    }
+  };
+
+  const handleMaximizeToggle = async () => {
+    if (typeof window !== 'undefined' && window.electronAPI?.maximizeWindow) {
+      const state = await window.electronAPI.maximizeWindow();
+      setIsMaximized(state);
+    } else {
+      setIsMaximized(!isMaximized);
+    }
+  };
+
+  const handleClose = () => {
+    if (typeof window !== 'undefined' && window.electronAPI?.closeWindow) {
+      window.electronAPI.closeWindow();
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen bg-[#f0f2f5] text-[#333333] select-none overflow-hidden font-sans">
       {/* Professional Polish Windows Desktop Header */}
@@ -95,7 +116,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
             <button
               id="lang-en-btn"
               onClick={() => onLanguageChange('en')}
-              className={`px-3 py-1 rounded transition text-xs ${
+              className={`px-3 py-1 rounded transition text-xs cursor-pointer ${
                 currentLanguage === 'en'
                   ? 'bg-white text-[#005a9e] rounded shadow-sm font-semibold'
                   : 'text-white hover:bg-white/10'
@@ -106,7 +127,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
             <button
               id="lang-si-btn"
               onClick={() => onLanguageChange('si')}
-              className={`px-3 py-1 rounded transition text-xs ${
+              className={`px-3 py-1 rounded transition text-xs cursor-pointer ${
                 currentLanguage === 'si'
                   ? 'bg-white text-[#005a9e] rounded shadow-sm font-semibold'
                   : 'text-white hover:bg-white/10'
@@ -117,7 +138,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
             <button
               id="lang-ta-btn"
               onClick={() => onLanguageChange('ta')}
-              className={`px-3 py-1 rounded transition text-xs ${
+              className={`px-3 py-1 rounded transition text-xs cursor-pointer ${
                 currentLanguage === 'ta'
                   ? 'bg-white text-[#005a9e] rounded shadow-sm font-semibold'
                   : 'text-white hover:bg-white/10'
@@ -143,22 +164,24 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
             <button
               id="win-min-btn"
               title="Minimize"
-              className="p-1.5 hover:bg-white/15 text-blue-100 hover:text-white rounded transition"
+              onClick={handleMinimize}
+              className="p-1.5 hover:bg-white/15 text-blue-100 hover:text-white rounded transition cursor-pointer"
             >
               <Minimize2 className="w-3.5 h-3.5" />
             </button>
             <button
               id="win-max-btn"
               title={isMaximized ? 'Restore' : 'Maximize'}
-              onClick={() => setIsMaximized(!isMaximized)}
-              className="p-1.5 hover:bg-white/15 text-blue-100 hover:text-white rounded transition"
+              onClick={handleMaximizeToggle}
+              className="p-1.5 hover:bg-white/15 text-blue-100 hover:text-white rounded transition cursor-pointer"
             >
               <Maximize2 className="w-3.5 h-3.5" />
             </button>
             <button
               id="win-close-btn"
               title="Exit Application"
-              className="p-1.5 hover:bg-red-600 text-blue-100 hover:text-white rounded transition"
+              onClick={handleClose}
+              className="p-1.5 hover:bg-red-600 text-blue-100 hover:text-white rounded transition cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>

@@ -20,7 +20,9 @@ import {
   RawAttendancePunch,
   Employee,
   Department,
-  Designation
+  Designation,
+  PayrollCategory,
+  AllowanceDeductionRule
 } from '../../types';
 import { translations } from '../../i18n/translations';
 import { AttendanceDeviceSettings } from './AttendanceDeviceSettings';
@@ -38,10 +40,14 @@ interface SettingsViewProps {
   employees?: Employee[];
   departments?: Department[];
   designations?: Designation[];
+  payrollCategories?: PayrollCategory[];
+  allowanceRules?: AllowanceDeductionRule[];
   onSaveDepartment?: (dept: Partial<Department>) => void;
   onDeleteDepartment?: (id: string) => { success: boolean; message?: string };
   onSaveDesignation?: (desig: Partial<Designation>) => void;
   onDeleteDesignation?: (id: string) => { success: boolean; message?: string };
+  onSavePayrollCategory?: (cat: Partial<PayrollCategory>) => void;
+  onDeletePayrollCategory?: (id: string) => { success: boolean; message?: string };
   onSaveDevice?: (device: Partial<FingerprintDevice>) => void;
   onPunchesDownloaded?: (punches: RawAttendancePunch[]) => void;
   onUpdateEmployee?: (emp: Partial<Employee>) => void;
@@ -59,10 +65,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   employees = [],
   departments = [],
   designations = [],
+  payrollCategories = [],
+  allowanceRules = [],
   onSaveDepartment = () => {},
   onDeleteDepartment = () => ({ success: true }),
   onSaveDesignation = () => {},
   onDeleteDesignation = () => ({ success: true }),
+  onSavePayrollCategory = () => {},
+  onDeletePayrollCategory = () => ({ success: true }),
   onSaveDevice = () => {},
   onPunchesDownloaded = () => {},
   onUpdateEmployee = () => {}
@@ -127,7 +137,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           }`}
         >
           <Briefcase className="w-4 h-4" />
-          Departments & Designations
+          Departments, Designations & Pay Categories
         </button>
 
         <button
@@ -159,10 +169,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           language={language}
           departments={departments}
           designations={designations}
+          payrollCategories={payrollCategories}
+          allowanceRules={allowanceRules}
           onSaveDepartment={onSaveDepartment}
           onDeleteDepartment={onDeleteDepartment}
           onSaveDesignation={onSaveDesignation}
           onDeleteDesignation={onDeleteDesignation}
+          onSavePayrollCategory={onSavePayrollCategory}
+          onDeletePayrollCategory={onDeletePayrollCategory}
         />
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">

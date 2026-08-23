@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { HikvisionISAPIClient, HikvisionConfig } from './hikvisionClient';
+import { SqliteDatabaseManager } from './sqliteDb';
 
 // Disable hardware acceleration to eliminate Windows GPU command buffer proxy crashes
 // [ERROR:gpu\ipc\client\command_buffer_proxy_impl.cc] GPU state invalid
@@ -17,6 +18,7 @@ console.log(`[Electron] Starting LankaHR Desktop Main Process (Electron v${proce
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 let mainWindow: BrowserWindow | null = null;
+let sqliteDb: SqliteDatabaseManager | null = null;
 
 // Ensure single instance lock on Windows
 const gotTheLock = app.requestSingleInstanceLock();
@@ -253,6 +255,81 @@ ipcMain.handle('fs:read-file', async (event, filePath: string) => {
     return { success: true, data };
   } catch (err: any) {
     return { success: false, error: err.message };
+  }
+});
+
+// SQLite IPC Handlers
+ipcMain.handle('db:init', async () => {
+  try {
+    if (!sqliteDb) {
+      sqliteDb = new SqliteDatabaseManager();
+    }
+    await sqliteDb.init();
+    const state = sqliteDb.getFullState();
+    return { success: true, state };
+  } catch (err: any) {
+    console.error('[Electron IPC db:init] Error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('db:save-all', async (event, state: any) => {
+  try {
+    if (!sqliteDb) {
+      sqliteDb = new SqliteDatabaseManager();
+      await sqliteDb.init();
+    }
+    const res = sqliteDb.saveFullState(state);
+    return res;
+  } catch (err: any) {
+    console.error('[Electron IPC db:save-all] Error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('db:clear', async () => {
+  try {
+    if (!sqliteDb) {
+      sqliteDb = new SqliteDatabaseManager();
+      await sqliteDb.init();
+    }
+    return sqliteDb.clearDatabase();
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('db:get-path', () => {
+  return sqliteDb ? sqliteDb.getDbPath() : path.join(app.getPath('userData'), 'lankahr.sqlite');
+});
+
+// Window Control Handlers
+ipcMain.handle('window:minimize', () => {
+  if (mainWindow) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.handle('window:maximize', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+      return false;
+    } else {
+      mainWindow.maximize();
+      return true;
+    }
+  }
+  return false;
+});
+
+ipcMain.handle('window:is-maximized', () => {
+  return mainWindow ? mainWindow.isMaximized() : false;
+});
+
+ipcMain.handle('window:close', () => {
+  if (mainWindow) {
+    mainWindow.close();
   }
 });
 

@@ -79,7 +79,9 @@ export default function App() {
   }, [currentMonth]);
 
   useEffect(() => {
-    loadAllData();
+    DatabaseService.initialize().then(() => {
+      loadAllData();
+    });
   }, [loadAllData]);
 
   // Handler: Language Change
@@ -128,7 +130,7 @@ export default function App() {
 
   // Handler: Update Single Attendance Record (Manual Correction)
   const handleUpdateSingleAttendance = (id: string, updates: Partial<ProcessedAttendance>) => {
-    DatabaseService.updateAttendanceRecord(id, updates, currentUserRole);
+    DatabaseService.saveManualAttendance({ id, ...updates }, currentUserRole);
     setAttendance(DatabaseService.getProcessedAttendance());
   };
 
@@ -200,6 +202,21 @@ export default function App() {
     const res = DatabaseService.deleteDesignation(id, currentUserRole);
     if (res.success) {
       setDesignations(DatabaseService.getDesignations());
+    }
+    return res;
+  };
+
+  // Handler: Save Payroll Category
+  const handleSavePayrollCategory = (cat: Partial<PayrollCategory>) => {
+    DatabaseService.savePayrollCategory(cat, currentUserRole);
+    setPayrollCategories(DatabaseService.getPayrollCategories());
+  };
+
+  // Handler: Delete Payroll Category
+  const handleDeletePayrollCategory = (id: string): { success: boolean; message?: string } => {
+    const res = DatabaseService.deletePayrollCategory(id, currentUserRole);
+    if (res.success) {
+      setPayrollCategories(DatabaseService.getPayrollCategories());
     }
     return res;
   };
@@ -306,6 +323,11 @@ export default function App() {
             payrollPeriod={payrollPeriod}
             settings={settings}
             allowanceRules={allowanceRules}
+            departments={departments}
+            designations={designations}
+            leaves={leaves}
+            incentives={incentives}
+            payrollCategories={payrollCategories}
             onSavePayrollPeriod={handleSavePayrollPeriod}
             onNavigate={setActiveTab}
           />
@@ -375,10 +397,14 @@ export default function App() {
             employees={employees}
             departments={departments}
             designations={designations}
+            payrollCategories={payrollCategories}
+            allowanceRules={allowanceRules}
             onSaveDepartment={handleSaveDepartment}
             onDeleteDepartment={handleDeleteDepartment}
             onSaveDesignation={handleSaveDesignation}
             onDeleteDesignation={handleDeleteDesignation}
+            onSavePayrollCategory={handleSavePayrollCategory}
+            onDeletePayrollCategory={handleDeletePayrollCategory}
             onSaveDevice={handleSaveDevice}
             onPunchesDownloaded={handlePunchesDownloaded}
             onUpdateEmployee={handleSaveEmployee}

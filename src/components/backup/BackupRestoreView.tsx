@@ -89,15 +89,15 @@ export const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
     reader.readAsText(file);
   };
 
-  const handleResetSampleData = () => {
+  const handleClearAllData = () => {
     if (
       confirm(
-        'Are you sure you want to reload the initial Sri Lankan demonstration dataset? Any custom additions will be refreshed.'
+        'Are you sure you want to clear all data and reset to a fresh, clean database? All registered employees, attendance logs, and payroll calculations will be permanently purged.'
       )
     ) {
-      DatabaseService.resetToSampleData();
+      DatabaseService.resetToCleanDatabase();
       onRefreshAllData();
-      alert('Sample dataset loaded!');
+      alert('All records cleared. Fresh database initialized!');
     }
   };
 
@@ -115,13 +115,28 @@ export const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={handleResetSampleData}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-[#f9fafb] text-[#374151] rounded-lg text-xs font-semibold border border-[#d1d5db] transition-colors shadow-xs cursor-pointer"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Reload Demo Dataset
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (confirm('Load sample test employees and incentive records for verification?')) {
+                DatabaseService.loadSampleDataset();
+                onRefreshAllData();
+                setRestoreMessage('Loaded 4 Sri Lankan test employees and incentives successfully.');
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#005a9e] rounded-lg text-xs font-semibold border border-blue-200 transition-colors shadow-xs cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Load Sample Test Dataset
+          </button>
+          <button
+            onClick={handleClearAllData}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-semibold border border-red-200 transition-colors shadow-xs cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Clear All Records (Fresh Start)
+          </button>
+        </div>
       </div>
 
       {restoreMessage && (

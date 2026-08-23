@@ -1,4 +1,4 @@
-import { FingerprintDevice, RawAttendancePunch, PunchType, VerificationMode } from '../types';
+import { FingerprintDevice, RawAttendancePunch } from '../types';
 import { HikvisionService } from './hikvisionService';
 import { DatabaseService } from './db';
 
@@ -25,148 +25,7 @@ export interface IBiometricDeviceAdapter {
   syncDeviceTime(device: FingerprintDevice): Promise<{ success: boolean; message: string }>;
 }
 
-// ZKTeco Adapter (ZKEMKeeper / Standalone SDK TCP 4370 protocol simulation & client)
-export class ZKTecoDeviceAdapter implements IBiometricDeviceAdapter {
-  async testConnection(device: FingerprintDevice): Promise<DeviceConnectionResult> {
-    const startTime = Date.now();
-    // Simulate real TCP handshake over IP/Port
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    // Validate IP format
-    const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-    if (!ipPattern.test(device.ipAddress)) {
-      return {
-        success: false,
-        message: 'Invalid IP address format. Expected format like 192.168.1.201',
-        responseTimeMs: Date.now() - startTime
-      };
-    }
-
-    if (device.port <= 0 || device.port > 65535) {
-      return {
-        success: false,
-        message: 'Invalid Port number. Standard ZKTeco port is 4370.',
-        responseTimeMs: Date.now() - startTime
-      };
-    }
-
-    return {
-      success: true,
-      message: `Successfully connected to ZKTeco device (${device.model}) via TCP/IP protocol.`,
-      responseTimeMs: Date.now() - startTime,
-      firmwareVersion: 'Ver 6.60 (Build Oct 2024)',
-      serialNumber: device.serialNumber || 'ZK-88491024',
-      deviceTime: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      totalLogsInDevice: 1420
-    };
-  }
-
-  async downloadAttendance(device: FingerprintDevice, startDate?: string, endDate?: string): Promise<DeviceDownloadResult> {
-    await new Promise(resolve => setTimeout(resolve, 1200));
-
-    const todayStr = new Date().toISOString().substring(0, 10);
-    const nowTimeStr = new Date().toLocaleTimeString('en-GB');
-
-    // Generate recent biometric punches
-    const samplePunches: RawAttendancePunch[] = [
-      {
-        id: `zk-punch-${Date.now()}-1`,
-        deviceId: device.id,
-        deviceName: device.name,
-        deviceUserId: '101',
-        punchTimestamp: `${todayStr}T08:15:22Z`,
-        punchDate: todayStr,
-        punchTime: '08:15:22',
-        punchType: 'IN',
-        verificationMode: 'FINGERPRINT',
-        isProcessed: false,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: `zk-punch-${Date.now()}-2`,
-        deviceId: device.id,
-        deviceName: device.name,
-        deviceUserId: '102',
-        punchTimestamp: `${todayStr}T08:24:45Z`,
-        punchDate: todayStr,
-        punchTime: '08:24:45',
-        punchType: 'IN',
-        verificationMode: 'FINGERPRINT',
-        isProcessed: false,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: `zk-punch-${Date.now()}-3`,
-        deviceId: device.id,
-        deviceName: device.name,
-        deviceUserId: '103',
-        punchTimestamp: `${todayStr}T08:28:10Z`,
-        punchDate: todayStr,
-        punchTime: '08:28:10',
-        punchType: 'IN',
-        verificationMode: 'FACE',
-        isProcessed: false,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: `zk-punch-${Date.now()}-4`,
-        deviceId: device.id,
-        deviceName: device.name,
-        deviceUserId: '104',
-        punchTimestamp: `${todayStr}T08:42:15Z`,
-        punchDate: todayStr,
-        punchTime: '08:42:15',
-        punchType: 'IN',
-        verificationMode: 'FINGERPRINT',
-        isProcessed: false,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: `zk-punch-${Date.now()}-5`,
-        deviceId: device.id,
-        deviceName: device.name,
-        deviceUserId: '105',
-        punchTimestamp: `${todayStr}T08:20:00Z`,
-        punchDate: todayStr,
-        punchTime: '08:20:00',
-        punchType: 'IN',
-        verificationMode: 'FINGERPRINT',
-        isProcessed: false,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: `zk-punch-${Date.now()}-6`,
-        deviceId: device.id,
-        deviceName: device.name,
-        deviceUserId: '106',
-        punchTimestamp: `${todayStr}T08:18:30Z`,
-        punchDate: todayStr,
-        punchTime: '08:18:30',
-        punchType: 'IN',
-        verificationMode: 'FINGERPRINT',
-        isProcessed: false,
-        createdAt: new Date().toISOString()
-      }
-    ];
-
-    return {
-      success: true,
-      punches: samplePunches,
-      count: samplePunches.length,
-      message: `Downloaded ${samplePunches.length} punch records from ZKTeco ${device.name}.`
-    };
-  }
-
-  async syncDeviceTime(device: FingerprintDevice): Promise<{ success: boolean; message: string }> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return {
-      success: true,
-      message: `Device clock on ${device.name} successfully synchronized to PC system time (${new Date().toLocaleTimeString()}).`
-    };
-  }
-}
-
-// Hikvision Adapter (Real ISAPI protocol over HTTP/HTTPS with Digest Auth)
+// Hikvision Adapter (Real ISAPI protocol over HTTP/HTTPS with Digest/Basic Auth)
 export class HikvisionDeviceAdapter implements IBiometricDeviceAdapter {
   async testConnection(device: FingerprintDevice): Promise<DeviceConnectionResult> {
     const res = await HikvisionService.testConnection(device);
@@ -204,72 +63,83 @@ export class HikvisionDeviceAdapter implements IBiometricDeviceAdapter {
   }
 }
 
-// Suprema Adapter (BioStar 2 API / IP Socket)
-export class SupremaDeviceAdapter implements IBiometricDeviceAdapter {
+// ZKTeco Adapter - Driver placeholder for future ZKEMKeeper SDK integration
+export class ZKTecoDeviceAdapter implements IBiometricDeviceAdapter {
   async testConnection(device: FingerprintDevice): Promise<DeviceConnectionResult> {
-    const startTime = Date.now();
-    await new Promise(resolve => setTimeout(resolve, 850));
-
     return {
-      success: true,
-      message: `Suprema BioStar API connection verified at ${device.ipAddress}:${device.port}.`,
-      responseTimeMs: Date.now() - startTime,
-      firmwareVersion: 'BS2-1.8.4',
-      serialNumber: device.serialNumber || 'SUP-BS2-540192',
-      deviceTime: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      totalLogsInDevice: 2100
+      success: false,
+      message: `Protocol not implemented for ${device.brand} (${device.model}). For direct automated synchronization, use the verified Hikvision ISAPI hardware terminal (DS-K1A8503MF) or import USB/CSV log files.`,
+      responseTimeMs: 0
     };
   }
 
-  async downloadAttendance(device: FingerprintDevice, startDate?: string, endDate?: string): Promise<DeviceDownloadResult> {
-    await new Promise(resolve => setTimeout(resolve, 1100));
+  async downloadAttendance(device: FingerprintDevice, _startDate?: string, _endDate?: string): Promise<DeviceDownloadResult> {
     return {
-      success: true,
+      success: false,
       punches: [],
       count: 0,
-      message: 'Suprema log sync complete. No new unread records found on device.'
+      message: `Protocol not implemented for ${device.brand}. Import attendance log CSV/DAT file from device USB drive.`
     };
   }
 
   async syncDeviceTime(device: FingerprintDevice): Promise<{ success: boolean; message: string }> {
-    await new Promise(resolve => setTimeout(resolve, 400));
     return {
-      success: true,
-      message: `Suprema device time synchronized successfully.`
+      success: false,
+      message: `Protocol not implemented for ${device.brand}.`
     };
   }
 }
 
-// Generic TCP/IP Adapter
-export class GenericTcpDeviceAdapter implements IBiometricDeviceAdapter {
+// Suprema Adapter - Driver placeholder for BioStar 2 SDK
+export class SupremaDeviceAdapter implements IBiometricDeviceAdapter {
   async testConnection(device: FingerprintDevice): Promise<DeviceConnectionResult> {
-    const startTime = Date.now();
-    await new Promise(resolve => setTimeout(resolve, 600));
-
     return {
-      success: true,
-      message: `Generic TCP socket handshake successful on ${device.ipAddress}:${device.port}.`,
-      responseTimeMs: Date.now() - startTime,
-      firmwareVersion: 'Generic-v1.0',
-      deviceTime: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      totalLogsInDevice: 320
+      success: false,
+      message: `Protocol not implemented for Suprema (${device.model}). Use Hikvision ISAPI (DS-K1A8503MF) or import standard CSV attendance logs.`,
+      responseTimeMs: 0
     };
   }
 
-  async downloadAttendance(device: FingerprintDevice, startDate?: string, endDate?: string): Promise<DeviceDownloadResult> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  async downloadAttendance(device: FingerprintDevice, _startDate?: string, _endDate?: string): Promise<DeviceDownloadResult> {
     return {
-      success: true,
+      success: false,
       punches: [],
       count: 0,
-      message: `Logs read from ${device.name}.`
+      message: `Protocol not implemented for Suprema.`
     };
   }
 
-  async syncDeviceTime(device: FingerprintDevice): Promise<{ success: boolean; message: string }> {
+  async syncDeviceTime(_device: FingerprintDevice): Promise<{ success: boolean; message: string }> {
     return {
-      success: true,
-      message: 'Time command sent to TCP device.'
+      success: false,
+      message: 'Protocol not implemented for Suprema.'
+    };
+  }
+}
+
+// Generic TCP/IP Adapter - Driver placeholder for Raw TCP/Socket
+export class GenericTcpDeviceAdapter implements IBiometricDeviceAdapter {
+  async testConnection(device: FingerprintDevice): Promise<DeviceConnectionResult> {
+    return {
+      success: false,
+      message: `Protocol not implemented for Generic TCP device on port ${device.port}. Use Hikvision ISAPI (DS-K1A8503MF) or file import.`,
+      responseTimeMs: 0
+    };
+  }
+
+  async downloadAttendance(device: FingerprintDevice, _startDate?: string, _endDate?: string): Promise<DeviceDownloadResult> {
+    return {
+      success: false,
+      punches: [],
+      count: 0,
+      message: `Protocol not implemented for Generic TCP device.`
+    };
+  }
+
+  async syncDeviceTime(_device: FingerprintDevice): Promise<{ success: boolean; message: string }> {
+    return {
+      success: false,
+      message: 'Protocol not implemented for Generic TCP device.'
     };
   }
 }
@@ -278,10 +148,10 @@ export class GenericTcpDeviceAdapter implements IBiometricDeviceAdapter {
 export class BiometricDeviceFactory {
   public static getAdapter(brand: string): IBiometricDeviceAdapter {
     switch (brand) {
-      case 'ZKTeco':
-        return new ZKTecoDeviceAdapter();
       case 'Hikvision':
         return new HikvisionDeviceAdapter();
+      case 'ZKTeco':
+        return new ZKTecoDeviceAdapter();
       case 'Suprema':
         return new SupremaDeviceAdapter();
       default:
