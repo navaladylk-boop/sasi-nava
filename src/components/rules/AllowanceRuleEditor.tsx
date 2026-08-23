@@ -90,7 +90,9 @@ export const AllowanceRuleEditor: React.FC<AllowanceRuleEditorProps> = ({
   const testResult = PayrollEngine.calculateAllowanceDeduction(
     testAllowance,
     testUnpaidDays,
-    [activeRule]
+    [activeRule],
+    undefined,
+    25 // Default mock working days for preview
   );
 
   return (

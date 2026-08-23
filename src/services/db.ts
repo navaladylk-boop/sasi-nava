@@ -1187,7 +1187,19 @@ export class DatabaseService {
   public static getMonthlyWorkingDaysConfig(monthYear: string): MonthlyWorkingDaysConfig {
     if (!this.state.monthlyWorkingDays) this.state.monthlyWorkingDays = [];
     const found = this.state.monthlyWorkingDays.find(m => m.month === monthYear);
-    if (found) return found;
+    if (found) {
+      if (found.finalWorkingDays === undefined) {
+        found.finalWorkingDays = found.manualOverride ? found.manualWorkingDays : found.autoWorkingDays;
+      }
+      // Fail-safe if it's still 0 or falsy due to some bad state
+      if (!found.finalWorkingDays) {
+        const [y, m] = monthYear.split('-');
+        const calc = this.calculateWorkingDaysForMonth(parseInt(y, 10), parseInt(m, 10));
+        found.autoWorkingDays = calc.autoWorkingDays;
+        found.finalWorkingDays = found.manualOverride ? (found.manualWorkingDays || calc.autoWorkingDays) : calc.autoWorkingDays;
+      }
+      return found;
+    }
 
     const [yearStr, monthStr] = monthYear.split('-');
     const year = parseInt(yearStr, 10) || new Date().getFullYear();
