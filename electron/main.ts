@@ -3,11 +3,76 @@ import path from 'path';
 import fs from 'fs';
 import { HikvisionISAPIClient, HikvisionConfig } from './hikvisionClient';
 
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+// Disable hardware acceleration to eliminate Windows GPU command buffer proxy crashes
+// [ERROR:gpu\ipc\client\command_buffer_proxy_impl.cc] GPU state invalid
+try {
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-gpu-compositing');
+} catch (gpuErr) {
+  console.warn('[Electron] Could not disable hardware acceleration:', gpuErr);
+}
 
+console.log(`[Electron] Starting LankaHR Desktop Main Process (Electron v${process.versions.electron}, Node v${process.versions.node}, Platform: ${process.platform})`);
+
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 let mainWindow: BrowserWindow | null = null;
 
+// Ensure single instance lock on Windows
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  console.log('[Electron] Another instance of LankaHR is already running. Exiting secondary instance.');
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    console.log('[Electron] Second instance launch detected. Focusing existing main window.');
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
+function getPreloadPath(): string {
+  const possiblePaths = [
+    path.join(__dirname, 'preload.cjs'),
+    path.join(__dirname, '../dist-electron/preload.cjs'),
+    path.join(app.getAppPath(), 'dist-electron/preload.cjs'),
+    path.join(app.getAppPath(), 'electron/preload.cjs')
+  ];
+
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+  return path.join(__dirname, 'preload.cjs');
+}
+
+function getProductionIndexPath(): string {
+  const candidatePaths = [
+    path.join(app.getAppPath(), 'dist', 'index.html'),
+    path.join(__dirname, '..', 'dist', 'index.html'),
+    path.join(__dirname, '..', '..', 'dist', 'index.html'),
+    path.join(process.resourcesPath, 'app', 'dist', 'index.html'),
+    path.join(process.resourcesPath, 'dist', 'index.html')
+  ];
+
+  for (const candidate of candidatePaths) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return path.join(app.getAppPath(), 'dist', 'index.html');
+}
+
 function createWindow() {
+  console.log('[Electron] Creating BrowserWindow...');
+
+  const preloadPath = getPreloadPath();
+  console.log(`[Electron] Preload script path: ${preloadPath} (exists: ${fs.existsSync(preloadPath)})`);
+
   mainWindow = new BrowserWindow({
     width: 1366,
     height: 820,
@@ -15,61 +80,136 @@ function createWindow() {
     minHeight: 700,
     title: 'LankaHR - Sri Lankan HRM, Attendance & Payroll System',
     frame: true,
+    show: false, // Show gracefully when ready
     autoHideMenuBar: false,
     backgroundColor: '#0a0f1d',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true,
-    },
+      sandbox: false // Recommended when using contextBridge with CommonJS preload
+    }
   });
+
+  console.log('[Electron] BrowserWindow created successfully. ID:', mainWindow.id);
+
+  // Show window when DOM / renderer is ready
+  mainWindow.once('ready-to-show', () => {
+    console.log('[Electron] Window ready-to-show event fired. Displaying window.');
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  // Safety fallback: if ready-to-show takes too long, ensure window is displayed
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      console.log('[Electron] Fallback: Forcing window visibility.');
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }, 2500);
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:3000';
 
   if (isDev) {
-    mainWindow.loadURL(devServerUrl);
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    console.log(`[Electron] Development mode active. Loading URL: ${devServerUrl}`);
+    mainWindow.loadURL(devServerUrl).catch(err => {
+      console.error(`[Electron] Failed to load dev URL (${devServerUrl}):`, err.message);
+    });
   } else {
-    // Load local built index.html
-    const indexPath = path.join(app.getAppPath(), 'dist/index.html');
-    if (fs.existsSync(indexPath)) {
-      mainWindow.loadFile(indexPath);
-    } else {
-      mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
-    }
+    const prodIndexPath = getProductionIndexPath();
+    console.log(`[Electron] Production mode active. Loading file: ${prodIndexPath}`);
+    mainWindow.loadFile(prodIndexPath).catch(err => {
+      console.error(`[Electron] Failed to load production index.html:`, err.message);
+    });
   }
 
+  // WebContents event logging & resilience handlers
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('[Electron WebContents] Renderer process finished loading successfully.');
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[Electron WebContents] Failed to load URL: ${validatedURL}`);
+    console.error(`[Electron WebContents] Error Code: ${errorCode}, Description: ${errorDescription}`);
+
+    if (isDev && errorCode !== -3) { // -3 is ABORTED
+      console.log('[Electron WebContents] Retrying dev server connection in 1.5s...');
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.loadURL(devServerUrl).catch(() => {});
+        }
+      }, 1500);
+    }
+  });
+
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error(`[Electron WebContents] Renderer process gone! Reason: ${details.reason}, Exit Code: ${details.exitCode}`);
+  });
+
+  mainWindow.webContents.on('unresponsive', () => {
+    console.warn('[Electron WebContents] Renderer process became unresponsive.');
+  });
+
+  mainWindow.webContents.on('responsive', () => {
+    console.log('[Electron WebContents] Renderer process became responsive again.');
+  });
+
   mainWindow.on('closed', () => {
+    console.log('[Electron] BrowserWindow closed event fired.');
     mainWindow = null;
   });
 }
 
 // System lifecycle handlers
 app.whenReady().then(() => {
+  console.log('[Electron] app.whenReady() resolved successfully.');
   createWindow();
 
   app.on('activate', () => {
+    console.log('[Electron] app.activate event fired.');
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
+}).catch(err => {
+  console.error('[Electron] Error during app.whenReady():', err);
 });
 
 app.on('window-all-closed', () => {
+  console.log('[Electron] app.window-all-closed event fired.');
   if (process.platform !== 'darwin') {
+    console.log('[Electron] Quitting application (platform != darwin)...');
     app.quit();
   }
 });
 
-// IPC Communication Handlers for native Windows OS integration
+app.on('before-quit', () => {
+  console.log('[Electron] app.before-quit event fired.');
+});
+
+app.on('will-quit', () => {
+  console.log('[Electron] app.will-quit event fired.');
+});
+
+// Process-level safety logging
+process.on('uncaughtException', (err) => {
+  console.error('[Electron] Uncaught Exception occurred in main process:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Electron] Unhandled Rejection occurred in main process:', reason);
+});
+
+// Native IPC Communication Handlers
 ipcMain.handle('app:get-version', () => {
   return app.getVersion();
 });
 
 ipcMain.handle('app:get-app-data-path', () => {
-  const userDataDir = app.getPath('userData');
-  return userDataDir;
+  return app.getPath('userData');
 });
 
 ipcMain.handle('dialog:save-backup', async (event, defaultName: string) => {
@@ -116,10 +256,11 @@ ipcMain.handle('fs:read-file', async (event, filePath: string) => {
   }
 });
 
-// Hikvision Real Hardware IPC Handlers
+// Hikvision Real Hardware IPC Handlers (Credential Safe)
 ipcMain.handle('device:hikvision-test', async (event, config: HikvisionConfig) => {
   const startTime = Date.now();
   try {
+    console.log(`[Electron Hikvision] Testing device at IP: ${config.ipAddress}:${config.port}`);
     const client = new HikvisionISAPIClient(config);
     const info = await client.getDeviceInfo();
     const deviceTime = await client.getDeviceTime();
@@ -135,6 +276,7 @@ ipcMain.handle('device:hikvision-test', async (event, config: HikvisionConfig) =
       deviceTime
     };
   } catch (err: any) {
+    console.error(`[Electron Hikvision] Connection test failed: ${err.message}`);
     return {
       success: false,
       message: `CONNECTION FAILED: ${err.message}`,
@@ -145,6 +287,7 @@ ipcMain.handle('device:hikvision-test', async (event, config: HikvisionConfig) =
 
 ipcMain.handle('device:hikvision-download', async (event, config: HikvisionConfig, startDate?: string, endDate?: string) => {
   try {
+    console.log(`[Electron Hikvision] Downloading attendance from IP: ${config.ipAddress}:${config.port} (Range: ${startDate || 'ALL'} to ${endDate || 'ALL'})`);
     const client = new HikvisionISAPIClient(config);
     const events = await client.getAttendanceEvents(startDate, endDate);
     return {
@@ -154,6 +297,7 @@ ipcMain.handle('device:hikvision-download', async (event, config: HikvisionConfi
       message: `Downloaded ${events.length} attendance records from Hikvision ${config.ipAddress}:${config.port}`
     };
   } catch (err: any) {
+    console.error(`[Electron Hikvision] Download logs failed: ${err.message}`);
     return {
       success: false,
       events: [],
@@ -162,4 +306,3 @@ ipcMain.handle('device:hikvision-download', async (event, config: HikvisionConfi
     };
   }
 });
-
