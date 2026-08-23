@@ -29,9 +29,6 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "LankaHR Payroll",
-    "installerIcon": "public/vite.svg",
-    "uninstallerIcon": "public/vite.svg",
-    "installerHeaderIcon": "public/vite.svg"
+    "shortcutName": "LankaHR Payroll"
   }
 }

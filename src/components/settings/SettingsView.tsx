@@ -8,10 +8,12 @@ import {
   Save,
   CheckCircle2,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  Radio
 } from 'lucide-react';
-import { CompanySettings, Language, UserRole } from '../../types';
+import { CompanySettings, Language, UserRole, FingerprintDevice, RawAttendancePunch, Employee } from '../../types';
 import { translations } from '../../i18n/translations';
+import { AttendanceDeviceSettings } from './AttendanceDeviceSettings';
 
 interface SettingsViewProps {
   language: Language;
@@ -20,6 +22,12 @@ interface SettingsViewProps {
   onUserRoleChange: (role: UserRole) => void;
   settings: CompanySettings;
   onSaveSettings: (settings: CompanySettings) => void;
+  devices?: FingerprintDevice[];
+  rawPunches?: RawAttendancePunch[];
+  employees?: Employee[];
+  onSaveDevice?: (device: Partial<FingerprintDevice>) => void;
+  onPunchesDownloaded?: (punches: RawAttendancePunch[]) => void;
+  onUpdateEmployee?: (emp: Partial<Employee>) => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -28,10 +36,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   currentUserRole,
   onUserRoleChange,
   settings,
-  onSaveSettings
+  onSaveSettings,
+  devices = [],
+  rawPunches = [],
+  employees = [],
+  onSaveDevice = () => {},
+  onPunchesDownloaded = () => {},
+  onUpdateEmployee = () => {}
 }) => {
   const t = translations[language];
 
+  const [activeSubTab, setActiveSubTab] = useState<'general' | 'device'>('general');
   const [formSettings, setFormSettings] = useState<CompanySettings>({ ...settings });
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
@@ -52,7 +67,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             {t.companySettings}
           </h1>
           <p className="text-xs text-[#6b7280] mt-0.5">
-            Configure company registration, EPF registration number, working hours, shift grace periods and statutory rates.
+            Configure company registration, EPF registration number, working hours, statutory rates, and biometric attendance devices.
           </p>
         </div>
 
@@ -64,7 +79,47 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Sub Tab Navigation */}
+      <div className="flex items-center gap-2 border-b border-[#d1d5db]">
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('general')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+            activeSubTab === 'general'
+              ? 'border-[#005a9e] text-[#005a9e] bg-white rounded-t-lg shadow-2xs'
+              : 'border-transparent text-[#6b7280] hover:text-[#111827]'
+          }`}
+        >
+          <Building2 className="w-4 h-4" />
+          Company Profile & Statutory
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('device')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+            activeSubTab === 'device'
+              ? 'border-[#005a9e] text-[#005a9e] bg-white rounded-t-lg shadow-2xs'
+              : 'border-transparent text-[#6b7280] hover:text-[#111827]'
+          }`}
+        >
+          <Radio className="w-4 h-4" />
+          Attendance Device (Hikvision DS-K1A8503MF)
+        </button>
+      </div>
+
+      {activeSubTab === 'device' ? (
+        <AttendanceDeviceSettings
+          language={language}
+          devices={devices}
+          rawPunches={rawPunches}
+          employees={employees}
+          onSaveDevice={onSaveDevice}
+          onPunchesDownloaded={onPunchesDownloaded}
+          onUpdateEmployee={onUpdateEmployee}
+        />
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
         {/* Company Profile Section */}
         <div className="bg-white border border-[#d1d5db] rounded-xl p-5 shadow-xs space-y-4">
           <h2 className="text-sm font-bold text-[#111827] flex items-center gap-2 border-b border-[#e5e7eb] pb-3">
@@ -270,6 +325,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
         </div>
       </form>
+      )}
     </div>
   );
 };

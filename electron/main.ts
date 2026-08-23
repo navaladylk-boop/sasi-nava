@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import { HikvisionISAPIClient, HikvisionConfig } from './hikvisionClient';
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
@@ -24,13 +25,19 @@ function createWindow() {
     },
   });
 
-  if (isDev && process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:3000';
+
+  if (isDev) {
+    mainWindow.loadURL(devServerUrl);
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     // Load local built index.html
-    const indexPath = path.join(__dirname, '../dist/index.html');
-    mainWindow.loadFile(indexPath);
+    const indexPath = path.join(app.getAppPath(), 'dist/index.html');
+    if (fs.existsSync(indexPath)) {
+      mainWindow.loadFile(indexPath);
+    } else {
+      mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    }
   }
 
   mainWindow.on('closed', () => {
@@ -108,3 +115,51 @@ ipcMain.handle('fs:read-file', async (event, filePath: string) => {
     return { success: false, error: err.message };
   }
 });
+
+// Hikvision Real Hardware IPC Handlers
+ipcMain.handle('device:hikvision-test', async (event, config: HikvisionConfig) => {
+  const startTime = Date.now();
+  try {
+    const client = new HikvisionISAPIClient(config);
+    const info = await client.getDeviceInfo();
+    const deviceTime = await client.getDeviceTime();
+    const responseTimeMs = Date.now() - startTime;
+    return {
+      success: true,
+      message: `CONNECTED: Successfully verified Hikvision ${info.model} at ${config.ipAddress}:${config.port}`,
+      responseTimeMs,
+      firmwareVersion: info.firmwareVersion,
+      serialNumber: info.serialNumber,
+      deviceName: info.deviceName,
+      model: info.model,
+      deviceTime
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `CONNECTION FAILED: ${err.message}`,
+      responseTimeMs: Date.now() - startTime
+    };
+  }
+});
+
+ipcMain.handle('device:hikvision-download', async (event, config: HikvisionConfig, startDate?: string, endDate?: string) => {
+  try {
+    const client = new HikvisionISAPIClient(config);
+    const events = await client.getAttendanceEvents(startDate, endDate);
+    return {
+      success: true,
+      events,
+      count: events.length,
+      message: `Downloaded ${events.length} attendance records from Hikvision ${config.ipAddress}:${config.port}`
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      events: [],
+      count: 0,
+      message: `Failed to download attendance logs: ${err.message}`
+    };
+  }
+});
+

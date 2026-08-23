@@ -234,30 +234,30 @@ const initialEmployees: Employee[] = [
 
 const initialDevices: FingerprintDevice[] = [
   {
+    id: 'dev-hikvision-01',
+    name: 'Hikvision Attendance Device',
+    brand: 'Hikvision',
+    model: 'DS-K1A8503MF',
+    ipAddress: '192.168.1.201',
+    port: 80,
+    username: 'admin',
+    password: '',
+    communicationType: 'TCP_IP',
+    status: 'UNTESTED',
+    lastSyncTime: '',
+    serialNumber: ''
+  },
+  {
     id: 'dev-01',
     name: 'Main Factory Gate (ZKTeco K40)',
     brand: 'ZKTeco',
     model: 'ZKTeco K40 Pro / IN01',
-    ipAddress: '192.168.1.201',
+    ipAddress: '192.168.1.205',
     port: 4370,
     communicationType: 'TCP_IP',
-    status: 'ONLINE',
-    lastSyncTime: '2026-01-31 18:30',
-    serialNumber: 'ZK-LK-2024-9981'
-  },
-  {
-    id: 'dev-02',
-    name: 'Office Entrance (Hikvision Face)',
-    brand: 'Hikvision',
-    model: 'Hikvision DS-K1T341AMF',
-    ipAddress: '192.168.1.202',
-    port: 8000,
-    username: 'admin',
-    password: 'Password@123',
-    communicationType: 'TCP_IP',
-    status: 'ONLINE',
-    lastSyncTime: '2026-01-31 18:35',
-    serialNumber: 'HK-LK-2025-4122'
+    status: 'UNTESTED',
+    lastSyncTime: '',
+    serialNumber: ''
   }
 ];
 

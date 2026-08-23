@@ -447,8 +447,32 @@ export const FingerprintDeviceView: React.FC<FingerprintDeviceViewProps> = ({
                   <input
                     type="number"
                     required
-                    value={editingDevice.port || 4370}
+                    value={editingDevice.port || 80}
                     onChange={e => setEditingDevice({ ...editingDevice, port: Number(e.target.value) })}
+                    className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[#4b5563] mb-1 font-medium">Username</label>
+                  <input
+                    type="text"
+                    value={editingDevice.username || ''}
+                    onChange={e => setEditingDevice({ ...editingDevice, username: e.target.value })}
+                    placeholder="admin"
+                    className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] focus:border-[#005a9e] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[#4b5563] mb-1 font-medium">Password (Masked)</label>
+                  <input
+                    type="password"
+                    value={editingDevice.password || ''}
+                    onChange={e => setEditingDevice({ ...editingDevice, password: e.target.value })}
+                    placeholder="••••••••"
                     className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
                   />
                 </div>

@@ -44,12 +44,17 @@ function createWindow() {
       sandbox: true
     }
   });
-  if (isDev && process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL || "http://localhost:3000";
+  if (isDev) {
+    mainWindow.loadURL(devServerUrl);
     mainWindow.webContents.openDevTools({ mode: "detach" });
   } else {
-    const indexPath = import_path.default.join(__dirname, "../dist/index.html");
-    mainWindow.loadFile(indexPath);
+    const indexPath = import_path.default.join(import_electron.app.getAppPath(), "dist/index.html");
+    if (import_fs.default.existsSync(indexPath)) {
+      mainWindow.loadFile(indexPath);
+    } else {
+      mainWindow.loadFile(import_path.default.join(__dirname, "../dist/index.html"));
+    }
   }
   mainWindow.on("closed", () => {
     mainWindow = null;

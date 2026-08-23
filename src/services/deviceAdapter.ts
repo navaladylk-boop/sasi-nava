@@ -1,4 +1,6 @@
 import { FingerprintDevice, RawAttendancePunch, PunchType, VerificationMode } from '../types';
+import { HikvisionService } from './hikvisionService';
+import { DatabaseService } from './db';
 
 export interface DeviceConnectionResult {
   success: boolean;
@@ -164,82 +166,40 @@ export class ZKTecoDeviceAdapter implements IBiometricDeviceAdapter {
   }
 }
 
-// Hikvision Adapter (ISAPI protocol / HTTP JSON client)
+// Hikvision Adapter (Real ISAPI protocol over HTTP/HTTPS with Digest Auth)
 export class HikvisionDeviceAdapter implements IBiometricDeviceAdapter {
   async testConnection(device: FingerprintDevice): Promise<DeviceConnectionResult> {
-    const startTime = Date.now();
-    await new Promise(resolve => setTimeout(resolve, 900));
-
+    const res = await HikvisionService.testConnection(device);
     return {
-      success: true,
-      message: `Hikvision ISAPI endpoint reachable at http://${device.ipAddress}:${device.port}/ISAPI/AccessControl`,
-      responseTimeMs: Date.now() - startTime,
-      firmwareVersion: 'V2.2.7_build231102',
-      serialNumber: device.serialNumber || 'HK-DS-K1T804-9812',
-      deviceTime: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      totalLogsInDevice: 850
+      success: res.success,
+      message: res.message,
+      responseTimeMs: res.responseTimeMs,
+      firmwareVersion: res.firmwareVersion,
+      serialNumber: res.serialNumber,
+      deviceTime: res.deviceTime
     };
   }
 
   async downloadAttendance(device: FingerprintDevice, startDate?: string, endDate?: string): Promise<DeviceDownloadResult> {
-    await new Promise(resolve => setTimeout(resolve, 1400));
-    const todayStr = new Date().toISOString().substring(0, 10);
-
-    const samplePunches: RawAttendancePunch[] = [
-      {
-        id: `hk-punch-${Date.now()}-1`,
-        deviceId: device.id,
-        deviceName: device.name,
-        deviceUserId: '101',
-        punchTimestamp: `${todayStr}T17:05:10Z`,
-        punchDate: todayStr,
-        punchTime: '17:05:10',
-        punchType: 'OUT',
-        verificationMode: 'FACE',
-        isProcessed: false,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: `hk-punch-${Date.now()}-2`,
-        deviceId: device.id,
-        deviceName: device.name,
-        deviceUserId: '102',
-        punchTimestamp: `${todayStr}T19:00:35Z`,
-        punchDate: todayStr,
-        punchTime: '19:00:35',
-        punchType: 'OUT',
-        verificationMode: 'FACE',
-        isProcessed: false,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: `hk-punch-${Date.now()}-3`,
-        deviceId: device.id,
-        deviceName: device.name,
-        deviceUserId: '103',
-        punchTimestamp: `${todayStr}T17:02:15Z`,
-        punchDate: todayStr,
-        punchTime: '17:02:15',
-        punchType: 'OUT',
-        verificationMode: 'CARD',
-        isProcessed: false,
-        createdAt: new Date().toISOString()
-      }
-    ];
-
+    const existingPunches = DatabaseService.getRawPunches();
+    const employees = DatabaseService.getEmployees();
+    const res = await HikvisionService.downloadAttendance(device, existingPunches, employees, startDate, endDate);
     return {
-      success: true,
-      punches: samplePunches,
-      count: samplePunches.length,
-      message: `Downloaded ${samplePunches.length} punch records from Hikvision ${device.name}.`
+      success: res.success,
+      punches: res.punches,
+      count: res.newRecordsCount,
+      message: res.message
     };
   }
 
   async syncDeviceTime(device: FingerprintDevice): Promise<{ success: boolean; message: string }> {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const test = await HikvisionService.testConnection(device);
+    if (!test.success) {
+      return { success: false, message: `Cannot sync time: ${test.message}` };
+    }
     return {
       success: true,
-      message: `Hikvision device time synchronized to ${new Date().toLocaleTimeString()}.`
+      message: `Hikvision terminal at ${device.ipAddress}:${device.port} clock verified (${test.deviceTime || new Date().toLocaleTimeString()}).`
     };
   }
 }

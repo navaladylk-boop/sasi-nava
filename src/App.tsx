@@ -312,6 +312,12 @@ export default function App() {
             onUserRoleChange={setCurrentUserRole}
             settings={settings}
             onSaveSettings={handleSaveSettings}
+            devices={devices}
+            rawPunches={rawPunches}
+            employees={employees}
+            onSaveDevice={handleSaveDevice}
+            onPunchesDownloaded={handlePunchesDownloaded}
+            onUpdateEmployee={handleSaveEmployee}
           />
         )}
 

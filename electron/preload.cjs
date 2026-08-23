@@ -9,4 +9,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openBackupDialog: () => ipcRenderer.invoke('dialog:open-backup'),
   writeFile: (filePath, content) => ipcRenderer.invoke('fs:write-file', filePath, content),
   readFile: (filePath) => ipcRenderer.invoke('fs:read-file', filePath),
+  testHikvisionDevice: (config) => ipcRenderer.invoke('device:hikvision-test', config),
+  downloadHikvisionAttendance: (config, startDate, endDate) => ipcRenderer.invoke('device:hikvision-download', config, startDate, endDate),
 });
