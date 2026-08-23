@@ -754,7 +754,15 @@ var SqliteDatabaseManager = class {
       const upsertRecord = (tableName, item, id) => {
         if (tableName === "holidays") {
           this.db.run(
-            `INSERT OR REPLACE INTO holidays (id, holiday_date, holiday_name, holiday_type, year, created_at, updated_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO holidays (id, holiday_date, holiday_name, holiday_type, year, created_at, updated_at, data)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               holiday_date = excluded.holiday_date,
+               holiday_name = excluded.holiday_name,
+               holiday_type = excluded.holiday_type,
+               year = excluded.year,
+               updated_at = excluded.updated_at,
+               data = excluded.data`,
             [
               id,
               item.date || "",
@@ -768,7 +776,18 @@ var SqliteDatabaseManager = class {
           );
         } else if (tableName === "monthly_working_days") {
           this.db.run(
-            `INSERT OR REPLACE INTO monthly_working_days (id, year, month, auto_working_days, manual_override, manual_working_days, final_working_days, updated_by, updated_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO monthly_working_days (id, year, month, auto_working_days, manual_override, manual_working_days, final_working_days, updated_by, updated_at, data)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               year = excluded.year,
+               month = excluded.month,
+               auto_working_days = excluded.auto_working_days,
+               manual_override = excluded.manual_override,
+               manual_working_days = excluded.manual_working_days,
+               final_working_days = excluded.final_working_days,
+               updated_by = excluded.updated_by,
+               updated_at = excluded.updated_at,
+               data = excluded.data`,
             [
               id,
               item.year || 0,
@@ -784,7 +803,12 @@ var SqliteDatabaseManager = class {
           );
         } else if (tableName === "departments") {
           this.db.run(
-            `INSERT OR REPLACE INTO departments (id, code, data, updated_at) VALUES (?, ?, ?, ?)`,
+            `INSERT INTO departments (id, code, data, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               code = excluded.code,
+               data = excluded.data,
+               updated_at = excluded.updated_at`,
             [
               id,
               item.code || "",
@@ -794,7 +818,12 @@ var SqliteDatabaseManager = class {
           );
         } else if (tableName === "designations") {
           this.db.run(
-            `INSERT OR REPLACE INTO designations (id, code, data, updated_at) VALUES (?, ?, ?, ?)`,
+            `INSERT INTO designations (id, code, data, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               code = excluded.code,
+               data = excluded.data,
+               updated_at = excluded.updated_at`,
             [
               id,
               item.code || "",
@@ -804,7 +833,12 @@ var SqliteDatabaseManager = class {
           );
         } else if (tableName === "leave_types") {
           this.db.run(
-            `INSERT OR REPLACE INTO leave_types (id, code, data, updated_at) VALUES (?, ?, ?, ?)`,
+            `INSERT INTO leave_types (id, code, data, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               code = excluded.code,
+               data = excluded.data,
+               updated_at = excluded.updated_at`,
             [
               id,
               item.code || "",
@@ -814,7 +848,12 @@ var SqliteDatabaseManager = class {
           );
         } else if (tableName === "employees") {
           this.db.run(
-            `INSERT OR REPLACE INTO employees (id, employee_code, data, updated_at) VALUES (?, ?, ?, ?)`,
+            `INSERT INTO employees (id, employee_code, data, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               employee_code = excluded.employee_code,
+               data = excluded.data,
+               updated_at = excluded.updated_at`,
             [
               id,
               item.employeeCode || "",
@@ -824,7 +863,12 @@ var SqliteDatabaseManager = class {
           );
         } else if (tableName === "devices") {
           this.db.run(
-            `INSERT OR REPLACE INTO devices (id, ip_address, data, updated_at) VALUES (?, ?, ?, ?)`,
+            `INSERT INTO devices (id, ip_address, data, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               ip_address = excluded.ip_address,
+               data = excluded.data,
+               updated_at = excluded.updated_at`,
             [
               id,
               item.ipAddress || "",
@@ -834,7 +878,14 @@ var SqliteDatabaseManager = class {
           );
         } else if (tableName === "raw_punches") {
           this.db.run(
-            `INSERT OR REPLACE INTO raw_punches (id, device_id, user_id, punch_timestamp, data, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO raw_punches (id, device_id, user_id, punch_timestamp, data, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               device_id = excluded.device_id,
+               user_id = excluded.user_id,
+               punch_timestamp = excluded.punch_timestamp,
+               data = excluded.data,
+               updated_at = excluded.updated_at`,
             [
               id,
               item.deviceId || "",
@@ -846,7 +897,13 @@ var SqliteDatabaseManager = class {
           );
         } else if (tableName === "processed_attendance") {
           this.db.run(
-            `INSERT OR REPLACE INTO processed_attendance (id, employee_id, date, data, updated_at) VALUES (?, ?, ?, ?, ?)`,
+            `INSERT INTO processed_attendance (id, employee_id, date, data, updated_at)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               employee_id = excluded.employee_id,
+               date = excluded.date,
+               data = excluded.data,
+               updated_at = excluded.updated_at`,
             [
               id,
               item.employeeId || "",
@@ -857,7 +914,14 @@ var SqliteDatabaseManager = class {
           );
         } else if (tableName === "employee_leaves") {
           this.db.run(
-            `INSERT OR REPLACE INTO employee_leaves (id, employee_id, start_date, end_date, data, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO employee_leaves (id, employee_id, start_date, end_date, data, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               employee_id = excluded.employee_id,
+               start_date = excluded.start_date,
+               end_date = excluded.end_date,
+               data = excluded.data,
+               updated_at = excluded.updated_at`,
             [
               id,
               item.employeeId || "",
@@ -869,7 +933,13 @@ var SqliteDatabaseManager = class {
           );
         } else if (tableName === "incentives") {
           this.db.run(
-            `INSERT OR REPLACE INTO incentives (id, employee_id, month_year, data, updated_at) VALUES (?, ?, ?, ?, ?)`,
+            `INSERT INTO incentives (id, employee_id, month_year, data, updated_at)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               employee_id = excluded.employee_id,
+               month_year = excluded.month_year,
+               data = excluded.data,
+               updated_at = excluded.updated_at`,
             [
               id,
               item.employeeId || "",
@@ -880,7 +950,12 @@ var SqliteDatabaseManager = class {
           );
         } else if (tableName === "payroll_periods") {
           this.db.run(
-            `INSERT OR REPLACE INTO payroll_periods (id, month_year, data, updated_at) VALUES (?, ?, ?, ?)`,
+            `INSERT INTO payroll_periods (id, month_year, data, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               month_year = excluded.month_year,
+               data = excluded.data,
+               updated_at = excluded.updated_at`,
             [
               id,
               item.monthYear || item.month || "",
@@ -890,7 +965,11 @@ var SqliteDatabaseManager = class {
           );
         } else {
           this.db.run(
-            `INSERT OR REPLACE INTO ${tableName} (id, data, updated_at) VALUES (?, ?, ?)`,
+            `INSERT INTO ${tableName} (id, data, updated_at)
+             VALUES (?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               data = excluded.data,
+               updated_at = excluded.updated_at`,
             [
               id,
               JSON.stringify(item),
