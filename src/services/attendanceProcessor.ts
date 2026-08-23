@@ -75,11 +75,15 @@ export class AttendanceProcessor {
     const shiftStartMinutes = shiftStartH * 60 + shiftStartM;
     const shiftEndMinutes = shiftEndH * 60 + shiftEndM;
     const graceMinutes = settings.lateGraceMinutes || 15;
-    const normalDailyHours = settings.normalWorkingHoursPerDay || settings.defaultWorkingHours || 8;
 
     // Process each active employee for every day of the month
     employees.forEach(emp => {
       if (!emp.isActive) return;
+
+      const empNormalHours = emp.normalWorkingHours || settings.normalWorkingHoursPerDay;
+      if (!empNormalHours || empNormalHours <= 0) {
+        throw new Error('Daily working hours are not configured.');
+      }
 
       for (let day = 1; day <= daysInMonth; day++) {
         const dayStr = day < 10 ? `0${day}` : `${day}`;
@@ -104,7 +108,10 @@ export class AttendanceProcessor {
         );
 
         const getLeaveDurationType = (leave: EmployeeLeave): 'FULL_DAY' | 'HALF_DAY' | 'SHORT_LEAVE' => {
-          if (leave.durationType) return leave.durationType;
+          if (leave.durationType) {
+            return leave.durationType;
+          }
+          // Legacy fallback for old records without durationType
           if (leave.durationMinutes && leave.durationMinutes > 0) return 'SHORT_LEAVE';
           if (leave.daysCount === 0.5) return 'HALF_DAY';
           const reasonLower = (leave.reason || '').toLowerCase();
@@ -229,8 +236,8 @@ export class AttendanceProcessor {
             const netMinutes = (breakTime > 0 && workedMinutes > 300) ? workedMinutes - breakTime : workedMinutes;
             const netHours = +(netMinutes / 60).toFixed(1);
 
-            if (netHours > normalDailyHours) {
-              otHours = +(netHours - normalDailyHours).toFixed(1);
+            if (netHours > empNormalHours) {
+              otHours = +(netHours - empNormalHours).toFixed(1);
             }
 
             if (outTotalMinutes < shiftEndMinutes) {
@@ -239,7 +246,7 @@ export class AttendanceProcessor {
           }
         } else {
           // Assume standard day if single punch
-          totalHours = normalDailyHours;
+          totalHours = empNormalHours;
         }
 
         // Calculate partial-day leave minutes (Approved Short Leave)
@@ -309,7 +316,7 @@ export class AttendanceProcessor {
           firstIn: firstInTime,
           lastOut: lastOutTime,
           totalHours,
-          normalHours: Math.min(totalHours, normalDailyHours),
+          normalHours: Math.min(totalHours, empNormalHours),
           otHours,
           lateMinutes: lateMins,
           earlyLeaveMinutes: earlyMins,

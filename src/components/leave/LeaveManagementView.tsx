@@ -242,7 +242,10 @@ export const LeaveManagementView: React.FC<LeaveManagementViewProps> = ({
 
     // Overlapping Leave Validation
     const getLeaveDurationType = (l: EmployeeLeave): 'FULL_DAY' | 'HALF_DAY' | 'SHORT_LEAVE' => {
-      if (l.durationType) return l.durationType;
+      if (l.durationType) {
+        return l.durationType;
+      }
+      // Legacy fallback for old records without durationType
       if (l.durationMinutes && l.durationMinutes > 0) return 'SHORT_LEAVE';
       if (l.daysCount === 0.5) return 'HALF_DAY';
       const reasonLower = (l.reason || '').toLowerCase();
