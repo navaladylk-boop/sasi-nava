@@ -200,11 +200,7 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
           </span>
           <span className="text-gray-300">•</span>
           <span className="flex items-center gap-1.5">
-            Hikvision: <span className="text-[#005a9e] font-semibold">Configured (DS-K1A8503MF @ 192.168.1.201)</span>
-          </span>
-          <span className="text-gray-300">•</span>
-          <span className="flex items-center gap-1.5">
-            ZKTeco: <span className="text-amber-700 font-semibold">Protocol Not Implemented</span>
+            Biometric Integration: <span className="text-[#005a9e] font-semibold">Hikvision (DS-K1A8503MF ISAPI Protocol)</span>
           </span>
         </div>
         <div className="text-[11px] text-[#9ca3af] font-normal">

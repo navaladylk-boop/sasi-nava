@@ -820,7 +820,7 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
                         className="w-full bg-white border border-[#d1d5db] rounded-lg pl-9 pr-3 py-2 text-[#111827] font-mono font-bold focus:border-[#005a9e] focus:outline-none"
                       />
                     </div>
-                    <p className="text-[10px] text-[#6b7280] mt-1">Must match user ID registered on ZKTeco / Hikvision hardware.</p>
+                    <p className="text-[10px] text-[#6b7280] mt-1">Must match user ID registered on Hikvision attendance hardware.</p>
                   </div>
 
                   <div>

@@ -226,8 +226,8 @@ export interface TranslationDictionary {
 
 export const translations: Record<Language, TranslationDictionary> = {
   en: {
-    appTitle: 'LankaHR Desktop',
-    appSubtitle: 'HRM, Attendance & Payroll for Sri Lanka',
+    appTitle: 'LankaHR - Hikvision Payroll & Attendance',
+    appSubtitle: 'Biometric Integration: Hikvision',
     dashboard: 'Dashboard',
     employees: 'Employees',
     attendance: 'Attendance',
@@ -314,7 +314,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     workingDaysPerMonth: 'Working Days / Month',
     normalWorkingHours: 'Working Hours / Day',
     otRateConfig: 'OT Rate Configuration',
-    fingerprintUserId: 'Fingerprint Machine User ID',
+    fingerprintUserId: 'Hikvision User ID',
     employeeList: 'Employee Directory',
     printEmployeeList: 'Print Employee List',
 
@@ -438,8 +438,8 @@ export const translations: Record<Language, TranslationDictionary> = {
     auditTrail: 'System Audit Logs'
   },
   si: {
-    appTitle: 'LankaHR ඩෙස්ක්ටොප්',
-    appSubtitle: 'ශ්‍රී ලංකාව සඳහා සරල මානව සම්පත්, පැමිණීම සහ වැටුප් කළමනාකරණය',
+    appTitle: 'LankaHR - Hikvision Payroll & Attendance',
+    appSubtitle: 'Biometric Integration: Hikvision',
     dashboard: 'මුල් පිටුව',
     employees: 'සේවක මණ්ඩලය',
     attendance: 'පැමිණීම',
@@ -650,8 +650,8 @@ export const translations: Record<Language, TranslationDictionary> = {
     auditTrail: 'පද්ධති ක්‍රියාකාරකම් සටහන (Audit Log)'
   },
   ta: {
-    appTitle: 'LankaHR டெஸ்க்டாப்',
-    appSubtitle: 'இலங்கைக்கான மனிதவளம், வருகை மற்றும் சம்பள முகாமைத்துவம்',
+    appTitle: 'LankaHR - Hikvision Payroll & Attendance',
+    appSubtitle: 'Biometric Integration: Hikvision',
     dashboard: 'முகப்பு',
     employees: 'ஊழியர்கள்',
     attendance: 'வருகை',
