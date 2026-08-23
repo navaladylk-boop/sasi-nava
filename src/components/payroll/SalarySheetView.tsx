@@ -119,15 +119,15 @@ export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
   const totalCost = records.reduce((s, r) => s + (r.costToCompany || 0), 0);
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto bg-slate-950 text-slate-100 space-y-5">
+    <div className="flex-1 p-6 overflow-y-auto bg-[#f0f2f5] text-[#111827] space-y-6 font-sans">
       {/* Action Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <TableProperties className="w-5 h-5 text-teal-400" />
-            {t.salarySheet} - <span className="font-mono text-teal-300">{currentMonth}</span>
+          <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2">
+            <TableProperties className="w-5 h-5 text-[#005a9e]" />
+            {t.salarySheet} - <span className="font-mono text-[#005a9e]">{currentMonth}</span>
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-[#6b7280] mt-0.5">
             Complete Sri Lankan statutory salary master sheet with EPF (8%/12%), ETF (3%), and No-Pay allowance deductions.
           </p>
         </div>
@@ -136,7 +136,7 @@ export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
           <button
             id="print-salary-sheet-btn"
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 transition"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-[#f9fafb] text-[#374151] rounded-lg text-xs font-semibold border border-[#d1d5db] transition-colors shadow-xs cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             {t.printSalarySheet}
@@ -145,7 +145,7 @@ export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
           <button
             id="export-sheet-excel-btn"
             onClick={handleExportCsv}
-            className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-semibold shadow-md shadow-teal-900/40 transition"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#005a9e] hover:bg-[#004880] text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             {t.exportExcel} (CSV)
@@ -165,66 +165,66 @@ export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
       </div>
 
       {/* Full Width Master Sheet Grid */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow">
+      <div className="bg-white border border-[#d1d5db] rounded-xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto max-h-[650px] overflow-y-auto">
           <table className="w-full text-left text-xs border-collapse font-sans">
-            <thead className="sticky top-0 bg-slate-950 text-slate-300 uppercase text-[10px] tracking-wider border-b border-slate-800 select-none">
+            <thead className="sticky top-0 bg-[#005a9e] text-white uppercase text-[10px] tracking-wider border-b border-[#004880] select-none">
               <tr>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800">Emp Code</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 min-w-[140px]">Employee Name</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800">EPF No</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right">Basic</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right text-rose-400">No-Pay Basic</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right">Net Basic</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right">Allowances</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right text-rose-400">No-Pay Allow</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right">Net Allow</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-center text-amber-300">OT (Hrs)</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right text-amber-300">OT Amount</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right text-emerald-300">Incentives</th>
-                <th className="py-2.5 px-2 bg-slate-900 border-r border-slate-800 text-right font-bold text-white">Gross</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right text-blue-400">EPF (8%)</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right text-rose-400">Advances</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right text-rose-400">Loans</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right text-rose-400">Total Deduct</th>
-                <th className="py-2.5 px-2 bg-emerald-950/80 border-r border-slate-800 text-right font-bold text-emerald-300">Net Payable</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right text-indigo-400">EPF (12%)</th>
-                <th className="py-2.5 px-2 bg-slate-950 border-r border-slate-800 text-right text-cyan-400">ETF (3%)</th>
-                <th className="py-2.5 px-2 bg-slate-950 text-right text-violet-300">Cost to Co.</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880]">Emp Code</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] min-w-[140px]">Employee Name</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880]">EPF No</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right">Basic</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-rose-200">No-Pay Basic</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right">Net Basic</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right">Allowances</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-rose-200">No-Pay Allow</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right">Net Allow</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-center text-amber-200">OT (Hrs)</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-amber-200">OT Amount</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-emerald-200">Incentives</th>
+                <th className="py-2.5 px-2 bg-[#004880] border-r border-[#003766] text-right font-bold text-white">Gross</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-blue-200">EPF (8%)</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-rose-200">Advances</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-rose-200">Loans</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-rose-200">Total Deduct</th>
+                <th className="py-2.5 px-2 bg-emerald-700 border-r border-emerald-800 text-right font-bold text-white">Net Payable</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-indigo-200">EPF (12%)</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-cyan-200">ETF (3%)</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] text-right text-violet-200">Cost to Co.</th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+            <tbody className="divide-y divide-[#e5e7eb] font-mono text-[11px]">
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={21} className="text-center py-10 text-slate-500 font-sans">
+                  <td colSpan={21} className="text-center py-10 text-[#9ca3af] font-sans">
                     No payroll data available for {currentMonth}. Go to "Payroll" screen and click "Calculate Salary".
                   </td>
                 </tr>
               ) : (
                 records.map(r => (
-                  <tr key={r.id} className="hover:bg-slate-800/30 transition">
-                    <td className="py-2 px-2 font-bold text-blue-400 border-r border-slate-800/60">{r.employeeCode}</td>
-                    <td className="py-2 px-2 font-sans font-medium text-slate-100 border-r border-slate-800/60">{r.employeeName}</td>
-                    <td className="py-2 px-2 text-emerald-400 border-r border-slate-800/60">{r.epfNumber}</td>
-                    <td className="py-2 px-2 text-right text-slate-200 border-r border-slate-800/60">{(r.basicSalary ?? 0).toLocaleString()}</td>
-                    <td className="py-2 px-2 text-right text-rose-400 border-r border-slate-800/60">{(r.noPayBasicDeduction ?? 0) > 0 ? `-${(r.noPayBasicDeduction ?? 0).toLocaleString()}` : '-'}</td>
-                    <td className="py-2 px-2 text-right text-slate-100 font-semibold border-r border-slate-800/60">{(r.netBasicSalary ?? 0).toLocaleString()}</td>
-                    <td className="py-2 px-2 text-right text-slate-300 border-r border-slate-800/60">{(r.totalAllowances ?? 0).toLocaleString()}</td>
-                    <td className="py-2 px-2 text-right text-rose-400 border-r border-slate-800/60">{(r.noPayAllowanceDeduction ?? 0) > 0 ? `-${(r.noPayAllowanceDeduction ?? 0).toLocaleString()}` : '-'}</td>
-                    <td className="py-2 px-2 text-right text-slate-200 border-r border-slate-800/60">{(r.netAllowances ?? 0).toLocaleString()}</td>
-                    <td className="py-2 px-2 text-center text-amber-300 border-r border-slate-800/60">{(r.otHours ?? 0) > 0 ? `${r.otHours}h` : '-'}</td>
-                    <td className="py-2 px-2 text-right text-amber-300 border-r border-slate-800/60">{(r.otAmount ?? 0) > 0 ? (r.otAmount ?? 0).toLocaleString() : '-'}</td>
-                    <td className="py-2 px-2 text-right text-emerald-300 border-r border-slate-800/60">{(r.incentives ?? 0) > 0 ? (r.incentives ?? 0).toLocaleString() : '-'}</td>
-                    <td className="py-2 px-2 text-right font-bold text-white bg-slate-800/40 border-r border-slate-800/60">{(r.grossSalary ?? 0).toLocaleString()}</td>
-                    <td className="py-2 px-2 text-right text-blue-400 border-r border-slate-800/60">-{(r.epfEmployeeAmount ?? 0).toLocaleString()}</td>
-                    <td className="py-2 px-2 text-right text-rose-400 border-r border-slate-800/60">{(r.salaryAdvance ?? 0) > 0 ? `-${(r.salaryAdvance ?? 0).toLocaleString()}` : '-'}</td>
-                    <td className="py-2 px-2 text-right text-rose-400 border-r border-slate-800/60">{(r.loanDeductions ?? 0) > 0 ? `-${(r.loanDeductions ?? 0).toLocaleString()}` : '-'}</td>
-                    <td className="py-2 px-2 text-right text-rose-300 font-semibold border-r border-slate-800/60">-{(r.totalDeductions ?? 0).toLocaleString()}</td>
-                    <td className="py-2 px-2 text-right font-bold text-emerald-400 bg-emerald-950/40 border-r border-slate-800/60">Rs. {(r.netSalary ?? 0).toLocaleString()}</td>
-                    <td className="py-2 px-2 text-right text-indigo-400 border-r border-slate-800/60">{(r.epfEmployerAmount ?? 0).toLocaleString()}</td>
-                    <td className="py-2 px-2 text-right text-cyan-400 border-r border-slate-800/60">{(r.etfEmployerAmount ?? 0).toLocaleString()}</td>
-                    <td className="py-2 px-2 text-right text-violet-300 font-semibold">{(r.costToCompany ?? 0).toLocaleString()}</td>
+                  <tr key={r.id} className="hover:bg-[#f8fafc] transition-colors">
+                    <td className="py-2 px-2 font-bold text-[#005a9e] border-r border-[#e5e7eb]">{r.employeeCode}</td>
+                    <td className="py-2 px-2 font-sans font-medium text-[#111827] border-r border-[#e5e7eb]">{r.employeeName}</td>
+                    <td className="py-2 px-2 text-emerald-700 border-r border-[#e5e7eb]">{r.epfNumber}</td>
+                    <td className="py-2 px-2 text-right text-[#374151] border-r border-[#e5e7eb]">{(r.basicSalary ?? 0).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">{(r.noPayBasicDeduction ?? 0) > 0 ? `-${(r.noPayBasicDeduction ?? 0).toLocaleString()}` : '-'}</td>
+                    <td className="py-2 px-2 text-right text-[#111827] font-semibold border-r border-[#e5e7eb]">{(r.netBasicSalary ?? 0).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right text-[#4b5563] border-r border-[#e5e7eb]">{(r.totalAllowances ?? 0).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">{(r.noPayAllowanceDeduction ?? 0) > 0 ? `-${(r.noPayAllowanceDeduction ?? 0).toLocaleString()}` : '-'}</td>
+                    <td className="py-2 px-2 text-right text-[#374151] border-r border-[#e5e7eb]">{(r.netAllowances ?? 0).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-center text-amber-700 border-r border-[#e5e7eb]">{(r.otHours ?? 0) > 0 ? `${r.otHours}h` : '-'}</td>
+                    <td className="py-2 px-2 text-right text-amber-700 border-r border-[#e5e7eb]">{(r.otAmount ?? 0) > 0 ? (r.otAmount ?? 0).toLocaleString() : '-'}</td>
+                    <td className="py-2 px-2 text-right text-emerald-700 border-r border-[#e5e7eb]">{(r.incentives ?? 0) > 0 ? (r.incentives ?? 0).toLocaleString() : '-'}</td>
+                    <td className="py-2 px-2 text-right font-bold text-[#111827] bg-[#f8fafc] border-r border-[#e5e7eb]">{(r.grossSalary ?? 0).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right text-[#005a9e] border-r border-[#e5e7eb]">-{(r.epfEmployeeAmount ?? 0).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">{(r.salaryAdvance ?? 0) > 0 ? `-${(r.salaryAdvance ?? 0).toLocaleString()}` : '-'}</td>
+                    <td className="py-2 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">{(r.loanDeductions ?? 0) > 0 ? `-${(r.loanDeductions ?? 0).toLocaleString()}` : '-'}</td>
+                    <td className="py-2 px-2 text-right text-rose-600 font-semibold border-r border-[#e5e7eb]">-{(r.totalDeductions ?? 0).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right font-bold text-emerald-700 bg-emerald-50 border-r border-[#e5e7eb]">Rs. {(r.netSalary ?? 0).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right text-indigo-700 border-r border-[#e5e7eb]">{(r.epfEmployerAmount ?? 0).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right text-cyan-700 border-r border-[#e5e7eb]">{(r.etfEmployerAmount ?? 0).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right text-violet-700 font-semibold">{(r.costToCompany ?? 0).toLocaleString()}</td>
                   </tr>
                 ))
               )}
@@ -232,31 +232,31 @@ export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
 
             {/* Totals Summary Footer */}
             {records.length > 0 && (
-              <tfoot className="bg-slate-950 font-mono font-bold text-xs border-t-2 border-slate-700 text-white select-none">
+              <tfoot className="bg-[#f8fafc] font-mono font-bold text-xs border-t-2 border-[#d1d5db] text-[#111827] select-none">
                 <tr>
-                  <td colSpan={3} className="py-3 px-2 text-right uppercase font-sans text-slate-300 border-r border-slate-800">
+                  <td colSpan={3} className="py-3 px-2 text-right uppercase font-sans text-[#4b5563] border-r border-[#e5e7eb]">
                     Grand Total ({records.length} Staff):
                   </td>
-                  <td className="py-3 px-2 text-right border-r border-slate-800">{(totalBasic ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right text-rose-400 border-r border-slate-800">-{(totalNoPayBasic ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right border-r border-slate-800">{(totalNetBasic ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right border-r border-slate-800">{(totalAllow ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right text-rose-400 border-r border-slate-800">-{(totalNoPayAllow ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right border-r border-slate-800">{(totalNetAllow ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-center text-amber-300 border-r border-slate-800">{totalOtHours || 0}h</td>
-                  <td className="py-3 px-2 text-right text-amber-300 border-r border-slate-800">{(totalOtAmount ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right text-emerald-300 border-r border-slate-800">{(totalIncentives ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right text-white bg-slate-900 border-r border-slate-800">{(totalGross ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right text-blue-400 border-r border-slate-800">-{(totalEpf8 ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right text-rose-400 border-r border-slate-800">-{(totalAdvances ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right text-rose-400 border-r border-slate-800">-{(totalLoans ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right text-rose-300 border-r border-slate-800">-{(totalDeducts ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right text-emerald-400 bg-emerald-950/80 border-r border-slate-800">
+                  <td className="py-3 px-2 text-right border-r border-[#e5e7eb]">{(totalBasic ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">-{(totalNoPayBasic ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right border-r border-[#e5e7eb]">{(totalNetBasic ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right border-r border-[#e5e7eb]">{(totalAllow ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">-{(totalNoPayAllow ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right border-r border-[#e5e7eb]">{(totalNetAllow ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-center text-amber-700 border-r border-[#e5e7eb]">{totalOtHours || 0}h</td>
+                  <td className="py-3 px-2 text-right text-amber-700 border-r border-[#e5e7eb]">{(totalOtAmount ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-emerald-700 border-r border-[#e5e7eb]">{(totalIncentives ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-[#111827] bg-white border-r border-[#e5e7eb]">{(totalGross ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-[#005a9e] border-r border-[#e5e7eb]">-{(totalEpf8 ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">-{(totalAdvances ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">-{(totalLoans ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">-{(totalDeducts ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-emerald-700 bg-emerald-100/60 border-r border-[#e5e7eb]">
                     Rs. {(totalNet ?? 0).toLocaleString()}
                   </td>
-                  <td className="py-3 px-2 text-right text-indigo-400 border-r border-slate-800">{(totalEpf12 ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right text-cyan-400 border-r border-slate-800">{(totalEtf3 ?? 0).toLocaleString()}</td>
-                  <td className="py-3 px-2 text-right text-violet-300">{(totalCost ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-indigo-700 border-r border-[#e5e7eb]">{(totalEpf12 ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-cyan-700 border-r border-[#e5e7eb]">{(totalEtf3 ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-violet-700">{(totalCost ?? 0).toLocaleString()}</td>
                 </tr>
               </tfoot>
             )}

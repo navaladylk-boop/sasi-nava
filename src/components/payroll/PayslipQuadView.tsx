@@ -72,7 +72,7 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
     return (
       <div
         key={record.id}
-        className="payslip-item bg-white text-slate-900 border-2 border-slate-300 rounded-lg p-3.5 flex flex-col justify-between shadow-sm text-[11px] font-sans relative overflow-hidden h-[380px] print:h-auto print:border-black"
+        className="single-payslip-quad payslip-item bg-white text-slate-900 border-2 border-slate-300 rounded-lg p-3.5 flex flex-col justify-between shadow-xs text-[11px] font-sans relative overflow-hidden h-[380px] print:h-auto print:border-black"
       >
         {/* Top Header */}
         <div>
@@ -241,23 +241,23 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
   };
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto bg-slate-950 text-slate-100 space-y-5">
+    <div className="flex-1 p-6 overflow-y-auto bg-[#f0f2f5] text-[#111827] space-y-6 font-sans">
       {/* Action Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Printer className="w-5 h-5 text-violet-400" />
-            {t.payslips} - <span className="font-mono text-violet-300">4-in-1 A4 Layout</span>
+          <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2">
+            <Printer className="w-5 h-5 text-[#005a9e]" />
+            {t.payslips} - <span className="font-mono text-[#005a9e]">4-in-1 A4 Layout</span>
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-[#6b7280] mt-0.5">
             Specifically formatted to print 4 equal payslip quadrants per standard A4 portrait sheet with Sri Lankan EPF/ETF and multilingual names.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {/* Multilingual Name Toggles */}
-          <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg text-xs">
-            <label className="flex items-center gap-1 cursor-pointer text-slate-300">
+          <div className="flex items-center gap-2 bg-white border border-[#d1d5db] px-3 py-1.5 rounded-lg text-xs shadow-xs">
+            <label className="flex items-center gap-1 cursor-pointer text-[#374151]">
               <input
                 type="checkbox"
                 checked={showSinhala}
@@ -266,7 +266,7 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
               />
               <span>සිංහල</span>
             </label>
-            <label className="flex items-center gap-1 cursor-pointer text-slate-300 ml-2">
+            <label className="flex items-center gap-1 cursor-pointer text-[#374151] ml-2">
               <input
                 type="checkbox"
                 checked={showTamil}
@@ -280,7 +280,7 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
           <button
             id="print-all-payslips-btn"
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-xs font-semibold shadow-md shadow-violet-900/40 transition"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#005a9e] hover:bg-[#004880] text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             {t.print4OnA4}
@@ -289,16 +289,16 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
       </div>
 
       {/* Page Navigation & Filter Bar (No Print) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 no-print text-xs">
+      <div className="bg-white border border-[#d1d5db] rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 no-print text-xs shadow-xs">
         <div className="flex items-center gap-2">
-          <Filter className="w-3.5 h-3.5 text-slate-400" />
+          <Filter className="w-3.5 h-3.5 text-[#6b7280]" />
           <select
             value={selectedEmpId}
             onChange={e => {
               setSelectedEmpId(e.target.value);
               setCurrentPage(0);
             }}
-            className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-violet-500"
+            className="bg-white border border-[#d1d5db] rounded-lg px-2.5 py-1.5 text-[#111827] focus:outline-none focus:border-[#005a9e]"
           >
             <option value="ALL">All Employees (4 per A4 page)</option>
             {employees.map(e => (
@@ -314,17 +314,17 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
           <button
             disabled={currentPage === 0}
             onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
-            className="p-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 rounded border border-slate-700 transition"
+            className="p-1.5 bg-white hover:bg-[#f9fafb] disabled:opacity-40 text-[#374151] rounded border border-[#d1d5db] transition-colors shadow-xs cursor-pointer"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-slate-300 font-mono">
+          <span className="text-[#374151] font-mono">
             Sheet <strong>{currentPage + 1}</strong> of <strong>{totalPages}</strong> ({displayedRecords.length} payslips)
           </span>
           <button
             disabled={currentPage >= totalPages - 1}
             onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
-            className="p-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 rounded border border-slate-700 transition"
+            className="p-1.5 bg-white hover:bg-[#f9fafb] disabled:opacity-40 text-[#374151] rounded border border-[#d1d5db] transition-colors shadow-xs cursor-pointer"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -332,15 +332,15 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
       </div>
 
       {/* Screen Preview Container: Styled like a real A4 Paper in 2x2 grid */}
-      <div className="no-print flex justify-center py-4">
-        <div className="w-full max-w-4xl bg-slate-900/50 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-          <div className="text-center text-xs font-semibold text-slate-400 mb-3 flex items-center justify-center gap-2">
-            <Layers className="w-4 h-4 text-violet-400" />
+      <div className="no-print flex justify-center py-2">
+        <div className="w-full max-w-4xl bg-white border border-[#d1d5db] rounded-2xl p-6 shadow-md">
+          <div className="text-center text-xs font-semibold text-[#6b7280] mb-3 flex items-center justify-center gap-2">
+            <Layers className="w-4 h-4 text-[#005a9e]" />
             <span>Interactive 4-Quadrant A4 Sheet Preview (Page {currentPage + 1} of {totalPages})</span>
           </div>
 
           {records.length === 0 ? (
-            <div className="text-center py-16 text-slate-500 text-xs">
+            <div className="text-center py-16 text-[#9ca3af] text-xs">
               No calculated payroll records found for {currentMonth}. Go to "Payroll" screen and click "Calculate Salary" first.
             </div>
           ) : (
@@ -350,7 +350,7 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
               {Array.from({ length: Math.max(0, 4 - pageRecords.length) }).map((_, idx) => (
                 <div
                   key={`empty-${idx}`}
-                  className="border-2 border-dashed border-slate-800 rounded-lg p-6 flex flex-col items-center justify-center text-slate-600 text-xs"
+                  className="border-2 border-dashed border-[#e5e7eb] rounded-lg p-6 flex flex-col items-center justify-center text-[#9ca3af] text-xs"
                 >
                   <span>[Blank Quadrant Slot]</span>
                 </div>
@@ -367,7 +367,7 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
           return (
             <div
               key={`print-page-${pageIdx}`}
-              className="payslip-sheet-a4 a4-grid-2x2 page-break"
+              className="a4-quad-sheet page-break"
             >
               {pageItems.map((rec, idx) => renderSinglePayslipCard(rec, idx))}
             </div>

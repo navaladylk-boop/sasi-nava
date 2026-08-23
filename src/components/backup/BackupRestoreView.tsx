@@ -95,7 +95,7 @@ export const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
         'Are you sure you want to reload the initial Sri Lankan demonstration dataset? Any custom additions will be refreshed.'
       )
     ) {
-      localStorage.clear();
+      DatabaseService.resetToSampleData();
       onRefreshAllData();
       alert('Sample dataset loaded!');
     }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Landmark,
   CheckCircle2,
@@ -47,6 +47,14 @@ export const EpfEtfManagementView: React.FC<EpfEtfManagementViewProps> = ({
   const [paymentDate, setPaymentDate] = useState<string>(
     payrollPeriod?.epfPaymentDate || new Date().toISOString().substring(0, 10)
   );
+
+  useEffect(() => {
+    setEpfPaid(payrollPeriod?.isEpfPaid || false);
+    setEtfPaid(payrollPeriod?.isEtfPaid || false);
+    setEpfPaymentRef(payrollPeriod?.epfPaymentReference || '');
+    setEtfPaymentRef(payrollPeriod?.etfPaymentReference || '');
+    setPaymentDate(payrollPeriod?.epfPaymentDate || new Date().toISOString().substring(0, 10));
+  }, [payrollPeriod]);
 
   const records = payrollPeriod?.records || [];
 
