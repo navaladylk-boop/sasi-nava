@@ -134,11 +134,14 @@ export class PayrollEngine {
       monthlyWorkingDays
     } = input;
 
-    const workingDays = monthlyWorkingDays || emp.workingDaysPerMonth || settings.defaultWorkingDaysPerMonth;
+    const workingDays = monthlyWorkingDays;
     if (!workingDays || workingDays <= 0) {
       throw new Error('Final working days are not configured for this payroll month.');
     }
-    const normalHours = emp.normalWorkingHours || settings.normalWorkingHoursPerDay || 8;
+    const normalHours = emp.normalWorkingHours || settings.normalWorkingHoursPerDay;
+    if (!normalHours || normalHours <= 0) {
+      throw new Error('Valid daily working hours are not configured for this employee or company.');
+    }
 
     // 1. Basic Salary & No-Pay basic deduction
     // Formula: Basic Daily Rate = Basic Salary ÷ Working Days (e.g. 30,000 ÷ 25 = 1,200/day)

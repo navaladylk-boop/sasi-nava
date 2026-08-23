@@ -244,10 +244,25 @@ export class AttendanceProcessor {
 
         // Calculate partial-day leave minutes (Approved Short Leave)
         const shortLeavesOnDate = approvedLeaves.filter(l => getLeaveDurationType(l) === 'SHORT_LEAVE');
-        let shortLeaveMins = 0;
+        const uniqueShortLeaveMins = new Set<number>();
+        let shortLeaveFallbackMins = 0;
+
         shortLeavesOnDate.forEach(l => {
-          shortLeaveMins += l.durationMinutes || 0;
+          if (l.startTime && l.endTime) {
+            const [sH, sM] = l.startTime.split(':').map(Number);
+            const [eH, eM] = l.endTime.split(':').map(Number);
+            const sTotal = sH * 60 + sM;
+            const eTotal = eH * 60 + eM;
+            if (eTotal > sTotal) {
+              for (let m = sTotal; m < eTotal; m++) {
+                uniqueShortLeaveMins.add(m);
+              }
+            }
+          } else {
+            shortLeaveFallbackMins += l.durationMinutes || Math.round((l.daysCount || 0) * 480);
+          }
         });
+        const shortLeaveMins = uniqueShortLeaveMins.size + shortLeaveFallbackMins;
 
         // Calculate unique time loss minutes with overlap protection
         const uniqueMins = new Set<number>();
@@ -275,8 +290,7 @@ export class AttendanceProcessor {
               }
             }
           } else {
-            const fallbackMins = Math.round((l.daysCount || 0) * 480);
-            shortLeaveMins += fallbackMins;
+            const fallbackMins = l.durationMinutes || Math.round((l.daysCount || 0) * 480);
             for (let m = shiftStartMinutes; m < shiftStartMinutes + fallbackMins; m++) {
               uniqueMins.add(m);
             }

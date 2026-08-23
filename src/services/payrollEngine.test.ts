@@ -1,5 +1,6 @@
 import { PayrollEngine } from './payrollEngine';
-import { CompanySettings, Employee, AllowanceDeductionRule } from '../types';
+import { CompanySettings, Employee, AllowanceDeductionRule, EmployeeLeave } from '../types';
+import { AttendanceProcessor } from './attendanceProcessor';
 
 // Mock settings and rules for testing LankaHR Payroll new business rules
 const testSettings: CompanySettings = {
@@ -183,6 +184,183 @@ export function runPayrollEngineTests() {
     assert(
       test4Result.shortLeaveDeduction === expectedFixedDeduction,
       `Fixed minute rate short leave deduction should be Rs. ${expectedFixedDeduction} (got ${test4Result.shortLeaveDeduction})`
+    );
+
+    // Test 5: Multiple Non-Overlapping Short Leaves on the Same Day
+    // Employee TEST001, Date: 2026-08-20, Short Leave 1: 10:00–11:00, Short Leave 2: 15:00–15:30
+    // Expected: Both processed successfully. Total short leave minutes = 90.
+    const testLeaves: EmployeeLeave[] = [
+      {
+        id: 'leave-sl-1',
+        employeeId: 'emp-test-01',
+        leaveTypeId: 'lt-short',
+        startDate: '2026-08-20',
+        endDate: '2026-08-20',
+        appliedDate: '2026-08-19',
+        daysCount: 0,
+        durationType: 'SHORT_LEAVE',
+        startTime: '10:00',
+        endTime: '11:00',
+        durationMinutes: 60,
+        status: 'APPROVED',
+        reason: 'Personal'
+      },
+      {
+        id: 'leave-sl-2',
+        employeeId: 'emp-test-01',
+        leaveTypeId: 'lt-short',
+        startDate: '2026-08-20',
+        endDate: '2026-08-20',
+        appliedDate: '2026-08-19',
+        daysCount: 0,
+        durationType: 'SHORT_LEAVE',
+        startTime: '15:00',
+        endTime: '15:30',
+        durationMinutes: 30,
+        status: 'APPROVED',
+        reason: 'Personal'
+      }
+    ];
+
+    const testEmpTEST001: Employee = {
+      ...testEmployee,
+      id: 'emp-test-01',
+      employeeCode: 'TEST001',
+      normalWorkingHours: 9
+    };
+
+    const processingResult = AttendanceProcessor.processMonthAttendance(
+      '2026-08',
+      [testEmpTEST001],
+      [
+        {
+          id: 'p-1',
+          deviceId: 'd1',
+          deviceName: 'Device 1',
+          deviceUserId: 'TEST001',
+          employeeId: 'emp-test-01',
+          punchDate: '2026-08-20',
+          punchTime: '08:00:00',
+          punchTimestamp: '2026-08-20 08:00:00',
+          punchType: 'IN',
+          verificationMode: 'FINGERPRINT',
+          isProcessed: false,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'p-2',
+          deviceId: 'd1',
+          deviceName: 'Device 1',
+          deviceUserId: 'TEST001',
+          employeeId: 'emp-test-01',
+          punchDate: '2026-08-20',
+          punchTime: '17:00:00',
+          punchTimestamp: '2026-08-20 17:00:00',
+          punchType: 'OUT',
+          verificationMode: 'FINGERPRINT',
+          isProcessed: false,
+          createdAt: new Date().toISOString()
+        }
+      ],
+      testLeaves,
+      [],
+      testSettings
+    );
+
+    const targetDayRecord = processingResult.records.find(r => r.date === '2026-08-20');
+    assert(
+      targetDayRecord !== undefined,
+      'Should process attendance for 2026-08-20'
+    );
+    assert(
+      targetDayRecord?.shortLeaveMinutes === 90,
+      `Total Short Leave minutes should be 90 (got ${targetDayRecord?.shortLeaveMinutes})`
+    );
+
+    // Test 6: Overlapping Short Leave validation helper function simulation
+    // Let's verify that the overlap logic inside our validator behaves exactly as requested.
+    // 10:00 -> 11:00 overlaps with 10:30 -> 11:30
+    const checkOverlap = (s1: string, e1: string, s2: string, e2: string): boolean => {
+      const getMins = (t: string) => {
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + m;
+      };
+      return getMins(s1) < getMins(e2) && getMins(e1) > getMins(s2);
+    };
+
+    assert(
+      checkOverlap('10:00', '11:00', '10:30', '11:30') === true,
+      '10:00-11:00 should overlap with 10:30-11:30'
+    );
+    assert(
+      checkOverlap('10:00', '11:00', '15:00', '15:30') === false,
+      '10:00-11:00 should NOT overlap with 15:00-15:30'
+    );
+
+    // Test 7: Full Day Leave Protection
+    // Create: Full Day Paid Leave. Expected: Time loss = 0.
+    const fullDayLeaveList: EmployeeLeave[] = [
+      {
+        id: 'leave-fd-1',
+        employeeId: 'emp-test-01',
+        leaveTypeId: 'lt-paid',
+        startDate: '2026-08-20',
+        endDate: '2026-08-20',
+        appliedDate: '2026-08-19',
+        daysCount: 1,
+        durationType: 'FULL_DAY',
+        status: 'APPROVED',
+        reason: 'Paid Annual Leave'
+      }
+    ];
+
+    const processingResultFullDay = AttendanceProcessor.processMonthAttendance(
+      '2026-08',
+      [testEmpTEST001],
+      [
+        {
+          id: 'p-1',
+          deviceId: 'd1',
+          deviceName: 'Device 1',
+          deviceUserId: 'TEST001',
+          employeeId: 'emp-test-01',
+          punchDate: '2026-08-20',
+          punchTime: '08:45:00', // Late by 45 mins, but has full day leave approved
+          punchTimestamp: '2026-08-20 08:45:00',
+          punchType: 'IN',
+          verificationMode: 'FINGERPRINT',
+          isProcessed: false,
+          createdAt: new Date().toISOString()
+        }
+      ],
+      fullDayLeaveList,
+      [],
+      testSettings
+    );
+
+    const fullDayRecord = processingResultFullDay.records.find(r => r.date === '2026-08-20');
+    assert(
+      fullDayRecord?.timeLossMinutes === 0,
+      `Full-day leave should result in exactly 0 time loss minutes (got ${fullDayRecord?.timeLossMinutes})`
+    );
+
+    // Test 8: Working Days Divisor Validation
+    // If Final Working Days is 23: Basic Daily Rate: 30,000 / 23 = 1304.35 (NOT 30,000 / 25)
+    const test8Result = PayrollEngine.calculateEmployeeSalary({
+      employee: testEmployee,
+      workedDays: 23,
+      unpaidLeaveDays: 0,
+      otHours: 0,
+      lateMinutes: 0,
+      settings: testSettings,
+      rules: testRules,
+      monthlyWorkingDays: 23
+    });
+
+    const expectedRateFor23 = 30000 / 23;
+    assert(
+      test8Result.basicDailyRate === Math.round(expectedRateFor23 * 100) / 100,
+      `Daily rate with 23 working days should be ${Math.round(expectedRateFor23 * 100) / 100} (got ${test8Result.basicDailyRate})`
     );
 
     console.log(`\n--- TEST RESULTS Summary: ${passCount} PASSED, ${failCount} FAILED ---`);

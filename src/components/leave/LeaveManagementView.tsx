@@ -241,20 +241,68 @@ export const LeaveManagementView: React.FC<LeaveManagementViewProps> = ({
     }
 
     // Overlapping Leave Validation
-    const overlap = leaves.find(l => {
-      if (editingLeaveId && l.id === editingLeaveId) return false;
-      if (l.employeeId !== formData.employeeId) return false;
-      if (l.status === 'REJECTED') return false;
+    const getLeaveDurationType = (l: EmployeeLeave): 'FULL_DAY' | 'HALF_DAY' | 'SHORT_LEAVE' => {
+      if (l.durationType) return l.durationType;
+      if (l.durationMinutes && l.durationMinutes > 0) return 'SHORT_LEAVE';
+      if (l.daysCount === 0.5) return 'HALF_DAY';
+      const reasonLower = (l.reason || '').toLowerCase();
+      if (reasonLower.includes('half')) return 'HALF_DAY';
+      if (reasonLower.includes('short')) return 'SHORT_LEAVE';
+      const leaveTypeLower = (l.leaveTypeId || '').toLowerCase();
+      if (leaveTypeLower.includes('half')) return 'HALF_DAY';
+      if (leaveTypeLower.includes('short')) return 'SHORT_LEAVE';
+      return l.daysCount >= 1.0 ? 'FULL_DAY' : 'SHORT_LEAVE';
+    };
+
+    let overlapError: string | null = null;
+    const currentType = formData.durationType || 'FULL_DAY';
+
+    for (const l of leaves) {
+      if (editingLeaveId && l.id === editingLeaveId) continue;
+      if (l.employeeId !== formData.employeeId) continue;
+      if (l.status === 'REJECTED') continue;
+
       // Check date range overlap
-      return (
+      const dateOverlap = (
         (formData.startDate! >= l.startDate && formData.startDate! <= l.endDate) ||
         (formData.endDate! >= l.startDate && formData.endDate! <= l.endDate) ||
         (l.startDate >= formData.startDate! && l.startDate <= formData.endDate!)
       );
-    });
 
-    if (overlap) {
-      setErrorMessage('Leave already exists for this employee during the selected dates.');
+      if (dateOverlap) {
+        const existingType = getLeaveDurationType(l);
+
+        if (currentType === 'FULL_DAY' || existingType === 'FULL_DAY') {
+          overlapError = 'Leave already exists for this employee during the selected dates.';
+          break;
+        }
+
+        if (currentType === 'SHORT_LEAVE' && existingType === 'SHORT_LEAVE') {
+          const curStartStr = formData.startTime || '';
+          const curEndStr = formData.endTime || '';
+          const exStartStr = l.startTime || '';
+          const exEndStr = l.endTime || '';
+
+          const curStart = calculateDiffMinutes('00:00', curStartStr);
+          const curEnd = calculateDiffMinutes('00:00', curEndStr);
+          const exStart = calculateDiffMinutes('00:00', exStartStr);
+          const exEnd = calculateDiffMinutes('00:00', exEndStr);
+
+          // Standard interval overlap: (start1 < end2) && (end1 > start2)
+          if (curStart < exEnd && curEnd > exStart) {
+            overlapError = 'Short Leave time overlaps with an existing Short Leave.';
+            break;
+          }
+        } else {
+          // Any other combination with HALF_DAY
+          overlapError = 'Leave already exists for this employee during the selected dates.';
+          break;
+        }
+      }
+    }
+
+    if (overlapError) {
+      setErrorMessage(overlapError);
       return;
     }
 
