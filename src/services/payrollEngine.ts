@@ -17,6 +17,8 @@ export interface SingleEmployeeSalaryInput {
   unpaidLeaveDays: number;
   otHours: number;
   lateMinutes: number;
+  shortLeaveMinutes?: number;
+  timeLossMinutes?: number;
   incentiveAmount?: number;
   loanDeduction?: number;
   advanceDeduction?: number;
@@ -26,6 +28,7 @@ export interface SingleEmployeeSalaryInput {
   categories?: PayrollCategory[];
   departments?: Department[];
   designations?: Designation[];
+  monthlyWorkingDays?: number;
 }
 
 export class PayrollEngine {
@@ -36,7 +39,8 @@ export class PayrollEngine {
     fixedAllowance: number,
     unpaidDays: number,
     rules: AllowanceDeductionRule[],
-    ruleId?: string
+    ruleId?: string,
+    workingDays: number = 25
   ): {
     deductionAmount: number;
     remainingAllowance: number;
@@ -82,9 +86,10 @@ export class PayrollEngine {
         }
       }
     } else if (rule.ruleType === 'DAILY_PRORATA') {
-      const dailyRate = fixedAllowance / 25;
+      const divisor = workingDays > 0 ? workingDays : 25;
+      const dailyRate = fixedAllowance / divisor;
       deduction = Math.round(dailyRate * unpaidDays);
-      breakdownParts.push(`${unpaidDays} days × (Rs. ${fixedAllowance} ÷ 25)`);
+      breakdownParts.push(`${unpaidDays} days × (Rs. ${fixedAllowance} ÷ ${divisor})`);
     } else if (rule.ruleType === 'PERCENTAGE') {
       const rate = rule.percentageRate || 4;
       deduction = Math.round(fixedAllowance * (rate / 100) * unpaidDays);
@@ -112,6 +117,8 @@ export class PayrollEngine {
       unpaidLeaveDays,
       otHours,
       lateMinutes,
+      shortLeaveMinutes,
+      timeLossMinutes,
       incentiveAmount = 0,
       loanDeduction = 0,
       advanceDeduction = 0,
@@ -120,10 +127,11 @@ export class PayrollEngine {
       rules,
       categories = [],
       departments = [],
-      designations = []
+      designations = [],
+      monthlyWorkingDays
     } = input;
 
-    const workingDays = emp.workingDaysPerMonth || settings.defaultWorkingDaysPerMonth || 25;
+    const workingDays = monthlyWorkingDays || emp.workingDaysPerMonth || settings.defaultWorkingDaysPerMonth || 25;
     const normalHours = emp.normalWorkingHours || settings.normalWorkingHoursPerDay || 8;
 
     // 1. Basic Salary & No-Pay basic deduction
@@ -141,7 +149,7 @@ export class PayrollEngine {
     // Resolve employee rule
     const category = categories.find(c => c.id === emp.payrollCategoryId);
     const targetRuleId = emp.allowanceDeductionRuleId || category?.allowanceDeductionRuleId;
-    const allowanceResult = this.calculateAllowanceDeduction(fixedAllowance, unpaidLeaveDays, rules, targetRuleId);
+    const allowanceResult = this.calculateAllowanceDeduction(fixedAllowance, unpaidLeaveDays, rules, targetRuleId, workingDays);
     const noPayAllowanceDeduction = allowanceResult.deductionAmount;
     const netAllowance = Math.max(0, totalAllowances - noPayAllowanceDeduction);
 
@@ -184,7 +192,13 @@ export class PayrollEngine {
     const etfEmployerAmount = isEtfEnabled ? Math.round((epfLiableSalary * etfEmplrRate) / 100) : 0;
 
     // 6. Deductions & Net Salary
-    const totalDeductions = epfEmployeeAmount + advanceDeduction + loanDeduction + otherDeductions;
+    // Short Leave / Time Loss calculation: 5 hours (300 mins) free monthly allowance
+    const eligibleTimeLoss = timeLossMinutes !== undefined ? timeLossMinutes : (lateMinutes || 0);
+    const excessTimeLoss = Math.max(0, eligibleTimeLoss - 300);
+    const hourlyRate = (workingDays * normalHours) > 0 ? (basicSalary / (workingDays * normalHours)) : 0;
+    const shortLeaveDeduction = Math.round(excessTimeLoss * (hourlyRate / 60));
+
+    const totalDeductions = epfEmployeeAmount + advanceDeduction + loanDeduction + otherDeductions + shortLeaveDeduction;
     const netSalary = Math.max(0, grossSalary - totalDeductions);
 
     // Cost to Company (CTC) = Gross Salary + Employer EPF 12% + Employer ETF 3%
@@ -216,6 +230,9 @@ export class PayrollEngine {
       unpaidLeaveDays,
       otHours,
       lateMinutes,
+      shortLeaveMinutes: shortLeaveMinutes ?? 0,
+      timeLossMinutes: eligibleTimeLoss,
+      shortLeaveDeduction,
       basicSalary,
       basicDailyRate: Math.round(basicDailyRate * 100) / 100,
       noPayBasicDeduction,

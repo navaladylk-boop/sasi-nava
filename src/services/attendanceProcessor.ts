@@ -42,13 +42,23 @@ export class AttendanceProcessor {
       }
     });
 
-    // Group raw punches by employeeId (or fingerprintUserId) and date
+    const normalizeId = (idStr?: string | number): string => {
+      if (idStr === undefined || idStr === null) return '';
+      return String(idStr).trim().toLowerCase().replace(/^emp-/, '').replace(/^0+/, '');
+    };
+
+    // Group raw punches by employeeId (or fingerprintUserId / employeeCode) and date
     const punchesByEmpDate = new Map<string, RawAttendancePunch[]>();
     rawPunches.forEach(punch => {
       // Find employee if not set
       let empId = punch.employeeId;
-      if (!empId) {
-        const found = employees.find(e => e.fingerprintUserId === punch.deviceUserId);
+      if (!empId && punch.deviceUserId) {
+        const normDeviceUserId = normalizeId(punch.deviceUserId);
+        const found = employees.find(e =>
+          normalizeId(e.fingerprintUserId) === normDeviceUserId ||
+          normalizeId(e.employeeCode) === normDeviceUserId ||
+          normalizeId(e.id) === normDeviceUserId
+        );
         empId = found?.id;
       }
       if (empId) {
@@ -84,8 +94,8 @@ export class AttendanceProcessor {
           continue;
         }
 
-        // Check for approved leaves
-        const matchingLeave = leaves.find(
+        // Check for approved leaves on this date
+        const approvedLeaves = leaves.filter(
           l =>
             l.employeeId === emp.id &&
             l.status === 'APPROVED' &&
@@ -93,8 +103,27 @@ export class AttendanceProcessor {
             dateStr <= l.endDate
         );
 
-        if (matchingLeave) {
-          const isNoPay = matchingLeave.leaveTypeId === 'lt-4' || matchingLeave.reason?.toLowerCase().includes('no pay');
+        const isFullDayLeave = (leave: EmployeeLeave): boolean => {
+          if (leave.daysCount < 1.0) return false;
+          const reasonLower = (leave.reason || '').toLowerCase();
+          if (reasonLower.includes('half') || reasonLower.includes('short') || reasonLower.includes('partial')) {
+            return false;
+          }
+          const leaveTypeLower = (leave.leaveTypeId || '').toLowerCase();
+          if (leaveTypeLower.includes('half') || leaveTypeLower.includes('short')) {
+            return false;
+          }
+          return true;
+        };
+
+        const fullDayLeave = approvedLeaves.find(isFullDayLeave);
+
+        if (fullDayLeave) {
+          const isNoPay =
+            fullDayLeave.leaveTypeId === 'lt-04' ||
+            fullDayLeave.leaveTypeId === 'lt-4' ||
+            fullDayLeave.reason?.toLowerCase().includes('no pay') ||
+            fullDayLeave.reason?.toLowerCase().includes('unpaid');
           results.push({
             id: `att-${emp.id}-${dateStr}`,
             employeeId: emp.id,
@@ -104,10 +133,12 @@ export class AttendanceProcessor {
             otHours: 0,
             lateMinutes: 0,
             earlyLeaveMinutes: 0,
+            shortLeaveMinutes: 0,
+            timeLossMinutes: 0,
             status: isNoPay ? 'NO_PAY' : 'LEAVE',
-            leaveTypeId: matchingLeave.leaveTypeId,
+            leaveTypeId: fullDayLeave.leaveTypeId,
             isManualCorrection: false,
-            remarks: matchingLeave.reason || 'Approved Leave'
+            remarks: fullDayLeave.reason || 'Approved Leave'
           });
           continue;
         }
@@ -123,6 +154,8 @@ export class AttendanceProcessor {
             otHours: 0,
             lateMinutes: 0,
             earlyLeaveMinutes: 0,
+            shortLeaveMinutes: 0,
+            timeLossMinutes: 0,
             status: 'WEEKEND',
             isManualCorrection: false,
             remarks: 'Sunday Holiday'
@@ -144,6 +177,8 @@ export class AttendanceProcessor {
             otHours: 0,
             lateMinutes: 0,
             earlyLeaveMinutes: 0,
+            shortLeaveMinutes: 0,
+            timeLossMinutes: 0,
             status: 'ABSENT',
             isManualCorrection: false,
             remarks: 'No biometric punch records detected'
@@ -202,6 +237,13 @@ export class AttendanceProcessor {
           totalHours = normalDailyHours;
         }
 
+        // Calculate partial-day leave minutes (Approved Short Leave / Half Day)
+        const partialLeavesOnDate = approvedLeaves.filter(l => !isFullDayLeave(l));
+        const shortLeaveMins = partialLeavesOnDate.reduce((sum, l) => sum + Math.round((l.daysCount || 0) * 480), 0);
+
+        // Calculate total time loss for the day
+        const dayTimeLoss = lateMins + earlyMins + shortLeaveMins;
+
         results.push({
           id: `att-${emp.id}-${dateStr}`,
           employeeId: emp.id,
@@ -213,6 +255,8 @@ export class AttendanceProcessor {
           otHours,
           lateMinutes: lateMins,
           earlyLeaveMinutes: earlyMins,
+          shortLeaveMinutes: shortLeaveMins,
+          timeLossMinutes: dayTimeLoss,
           status: 'PRESENT',
           isManualCorrection: false,
           remarks: otHours > 0 ? `Normal Shift + ${otHours} hrs OT` : (lateMins > 0 ? `Late by ${lateMins}m` : 'Normal Shift')

@@ -8,6 +8,7 @@ import {
   Layers
 } from 'lucide-react';
 import { PayrollPeriod, CompanySettings, Language } from '../../types';
+import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
 
 interface SalarySheetViewProps {
@@ -15,13 +16,15 @@ interface SalarySheetViewProps {
   currentMonth: string;
   payrollPeriod?: PayrollPeriod;
   settings: CompanySettings;
+  onBack?: () => void;
 }
 
 export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
   language,
   currentMonth,
   payrollPeriod,
-  settings
+  settings,
+  onBack
 }) => {
   const t = translations[language];
 
@@ -101,6 +104,7 @@ export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
   const totalBasic = records.reduce((s, r) => s + (r.basicSalary || 0), 0);
   const totalNoPayBasic = records.reduce((s, r) => s + (r.noPayBasicDeduction || 0), 0);
   const totalNetBasic = records.reduce((s, r) => s + (r.netBasicSalary || 0), 0);
+  const totalEpfBasis = records.reduce((s, r) => s + (r.epfLiableSalary ?? r.netBasicSalary ?? 0), 0);
   const totalAllow = records.reduce((s, r) => s + (r.totalAllowances || 0), 0);
   const totalNoPayAllow = records.reduce((s, r) => s + (r.noPayAllowanceDeduction || 0), 0);
   const totalNetAllow = records.reduce((s, r) => s + (r.netAllowances || 0), 0);
@@ -123,6 +127,9 @@ export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
       {/* Action Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            {onBack && <BackButton onClick={onBack} />}
+          </div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2">
             <TableProperties className="w-5 h-5 text-[#005a9e]" />
             {t.salarySheet} - <span className="font-mono text-[#005a9e]">{currentMonth}</span>
@@ -173,9 +180,10 @@ export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
                 <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880]">Emp Code</th>
                 <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] min-w-[140px]">Employee Name</th>
                 <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880]">EPF No</th>
-                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right">Basic</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right">Original Basic</th>
                 <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-rose-200">No-Pay Basic</th>
-                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right">Net Basic</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right font-bold text-white">Earned Basic</th>
+                <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-emerald-200">EPF Basis</th>
                 <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right">Allowances</th>
                 <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right text-rose-200">No-Pay Allow</th>
                 <th className="py-2.5 px-2 bg-[#005a9e] border-r border-[#004880] text-right">Net Allow</th>
@@ -197,7 +205,7 @@ export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
             <tbody className="divide-y divide-[#e5e7eb] font-mono text-[11px]">
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan={21} className="text-center py-10 text-[#9ca3af] font-sans">
+                  <td colSpan={22} className="text-center py-10 text-[#9ca3af] font-sans">
                     No payroll data available for {currentMonth}. Go to "Payroll" screen and click "Calculate Salary".
                   </td>
                 </tr>
@@ -210,6 +218,7 @@ export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
                     <td className="py-2 px-2 text-right text-[#374151] border-r border-[#e5e7eb]">{(r.basicSalary ?? 0).toLocaleString()}</td>
                     <td className="py-2 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">{(r.noPayBasicDeduction ?? 0) > 0 ? `-${(r.noPayBasicDeduction ?? 0).toLocaleString()}` : '-'}</td>
                     <td className="py-2 px-2 text-right text-[#111827] font-semibold border-r border-[#e5e7eb]">{(r.netBasicSalary ?? 0).toLocaleString()}</td>
+                    <td className="py-2 px-2 text-right text-emerald-700 font-medium border-r border-[#e5e7eb]">{(r.epfLiableSalary ?? r.netBasicSalary ?? 0).toLocaleString()}</td>
                     <td className="py-2 px-2 text-right text-[#4b5563] border-r border-[#e5e7eb]">{(r.totalAllowances ?? 0).toLocaleString()}</td>
                     <td className="py-2 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">{(r.noPayAllowanceDeduction ?? 0) > 0 ? `-${(r.noPayAllowanceDeduction ?? 0).toLocaleString()}` : '-'}</td>
                     <td className="py-2 px-2 text-right text-[#374151] border-r border-[#e5e7eb]">{(r.netAllowances ?? 0).toLocaleString()}</td>
@@ -240,6 +249,7 @@ export const SalarySheetView: React.FC<SalarySheetViewProps> = ({
                   <td className="py-3 px-2 text-right border-r border-[#e5e7eb]">{(totalBasic ?? 0).toLocaleString()}</td>
                   <td className="py-3 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">-{(totalNoPayBasic ?? 0).toLocaleString()}</td>
                   <td className="py-3 px-2 text-right border-r border-[#e5e7eb]">{(totalNetBasic ?? 0).toLocaleString()}</td>
+                  <td className="py-3 px-2 text-right text-emerald-700 border-r border-[#e5e7eb]">{(totalEpfBasis ?? 0).toLocaleString()}</td>
                   <td className="py-3 px-2 text-right border-r border-[#e5e7eb]">{(totalAllow ?? 0).toLocaleString()}</td>
                   <td className="py-3 px-2 text-right text-rose-600 border-r border-[#e5e7eb]">-{(totalNoPayAllow ?? 0).toLocaleString()}</td>
                   <td className="py-3 px-2 text-right border-r border-[#e5e7eb]">{(totalNetAllow ?? 0).toLocaleString()}</td>

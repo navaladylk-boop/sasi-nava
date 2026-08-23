@@ -20,6 +20,7 @@ import {
   Language,
   Department
 } from '../../types';
+import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
 
 interface ReportsViewProps {
@@ -30,6 +31,7 @@ interface ReportsViewProps {
   payrollPeriod?: PayrollPeriod;
   departments: Department[];
   settings: CompanySettings;
+  onBack?: () => void;
 }
 
 type ReportType =
@@ -49,7 +51,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   attendance,
   payrollPeriod,
   departments,
-  settings
+  settings,
+  onBack
 }) => {
   const t = translations[language];
 
@@ -137,6 +140,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       {/* Top Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            {onBack && <BackButton onClick={onBack} />}
+          </div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2">
             <FileBarChart className="w-5 h-5 text-[#005a9e]" />
             {t.reports}

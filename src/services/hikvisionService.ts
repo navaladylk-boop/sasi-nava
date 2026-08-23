@@ -18,6 +18,13 @@ export interface HikvisionSyncReport {
   };
 }
 
+export function normalizeEmployeeId(idStr?: string | number): string {
+  if (idStr === undefined || idStr === null) return '';
+  const str = String(idStr).trim().toLowerCase();
+  // Remove leading zeros and optional 'emp-' prefix for flexible matching
+  return str.replace(/^emp-/, '').replace(/^0+/, '');
+}
+
 export class HikvisionService {
   /**
    * Test physical connection to Hikvision biometric terminal (e.g. DS-K1A8503MF at 192.168.1.201:80)
@@ -168,30 +175,45 @@ export class HikvisionService {
       };
     }
 
-    // Process and prevent duplicates
-    const existingKeys = new Set(
-      existingPunches.map(p => `${p.deviceId}_${p.deviceUserId}_${p.punchTimestamp}_${p.punchType}`)
-    );
-
-    // Build employee lookup maps for mapping Hikvision Person ID -> HRM Employee
-    const empByBiometricId = new Map<string, Employee>();
-    const empByCode = new Map<string, Employee>();
+    // Build employee lookup maps for mapping Hikvision Person ID -> HRM Employee using normalized keys
+    const empLookupMap = new Map<string, Employee>();
     employees.forEach(emp => {
       if (emp.fingerprintUserId) {
-        empByBiometricId.set(emp.fingerprintUserId.trim().toLowerCase(), emp);
+        empLookupMap.set(normalizeEmployeeId(emp.fingerprintUserId), emp);
       }
       if (emp.employeeCode) {
-        empByCode.set(emp.employeeCode.trim().toLowerCase(), emp);
+        empLookupMap.set(normalizeEmployeeId(emp.employeeCode), emp);
+      }
+      if (emp.id) {
+        empLookupMap.set(normalizeEmployeeId(emp.id), emp);
       }
     });
 
-    const newPunches: RawAttendancePunch[] = [];
+    // Map existing punches for fast lookup and re-linking
+    const existingPunchesMap = new Map<string, RawAttendancePunch>();
+    existingPunches.forEach(p => {
+      const key = `${p.deviceId}_${normalizeEmployeeId(p.deviceUserId)}_${p.punchTimestamp}_${p.punchType}`;
+      existingPunchesMap.set(key, p);
+    });
+
+    const newOrUpdatedPunches: RawAttendancePunch[] = [];
+    let newRecordsCount = 0;
+    let relinkedCount = 0;
     let duplicateCount = 0;
     let unmappedCount = 0;
+    const userIdsFound = new Set<string>();
+    const timestampsFound = new Set<string>();
+    const filterReasons: string[] = [];
 
     downloadResponse.events.forEach(evt => {
       const rawEmpId = String(evt.employeeNo || '').trim();
-      if (!rawEmpId) return;
+      if (!rawEmpId) {
+        filterReasons.push(`Event at ${evt.time} missing employeeNo`);
+        return;
+      }
+
+      userIdsFound.add(rawEmpId);
+      timestampsFound.add(evt.time);
 
       // Extract ISO Date & Time
       let isoTime = evt.time;
@@ -221,30 +243,41 @@ export class HikvisionService {
       else if (evt.verifyMode === 'CARD' || evt.minor === 1) verifyMode = 'CARD';
       else if (evt.verifyMode === 'PASSWORD' || evt.minor === 77) verifyMode = 'PASSWORD';
 
-      // Unique record key for duplicate prevention
-      const recordKey = `${device.id}_${rawEmpId}_${punchDate}T${punchTime}Z_${punchType}`;
-      if (existingKeys.has(recordKey)) {
-        duplicateCount++;
-        return;
-      }
+      const normUserKey = normalizeEmployeeId(rawEmpId);
+      const punchTimestamp = `${punchDate}T${punchTime}Z`;
+      const recordKey = `${device.id}_${normUserKey}_${punchTimestamp}_${punchType}`;
 
-      // Match employee
-      const matchedEmp =
-        empByBiometricId.get(rawEmpId.toLowerCase()) ||
-        empByCode.get(rawEmpId.toLowerCase()) ||
-        empByCode.get(`emp-${rawEmpId.toLowerCase()}`);
+      // Flexible employee matching (fingerprintUserId / employeeCode / id)
+      const matchedEmp = empLookupMap.get(normUserKey);
 
       if (!matchedEmp) {
         unmappedCount++;
       }
 
+      const existingPunch = existingPunchesMap.get(recordKey);
+
+      if (existingPunch) {
+        // If punch exists in SQLite without employeeId and now matchedEmp exists, re-link it!
+        if (!existingPunch.employeeId && matchedEmp) {
+          existingPunch.employeeId = matchedEmp.id;
+          relinkedCount++;
+          newOrUpdatedPunches.push(existingPunch);
+          console.log(`[Hikvision Diagnostic] Re-linked historical punch for deviceUserId ${rawEmpId} to Employee ${matchedEmp.employeeCode} (${matchedEmp.fullName}) on ${punchDate} ${punchTime}`);
+        } else {
+          duplicateCount++;
+          filterReasons.push(`Duplicate punch for ${rawEmpId} at ${punchDate} ${punchTime} (${punchType})`);
+        }
+        return;
+      }
+
+      // Create new punch record
       const punchRecord: RawAttendancePunch = {
-        id: `hk-punch-${device.id}-${evt.serialNo || Date.now()}-${newPunches.length + 1}`,
+        id: `hk-punch-${device.id}-${evt.serialNo || Date.now()}-${newOrUpdatedPunches.length + 1}`,
         deviceId: device.id,
         deviceName: device.name,
         deviceUserId: rawEmpId,
         employeeId: matchedEmp ? matchedEmp.id : undefined,
-        punchTimestamp: `${punchDate}T${punchTime}Z`,
+        punchTimestamp,
         punchDate,
         punchTime,
         punchType,
@@ -253,21 +286,37 @@ export class HikvisionService {
         createdAt: new Date().toISOString()
       };
 
-      existingKeys.add(recordKey);
-      newPunches.push(punchRecord);
+      existingPunchesMap.set(recordKey, punchRecord);
+      newOrUpdatedPunches.push(punchRecord);
+      newRecordsCount++;
     });
 
     const totalDownloaded = downloadResponse.events.length;
-    const finalSummaryMessage = `Attendance synchronization completed.\n\nTotal downloaded: ${totalDownloaded.toLocaleString()}\nNew records: ${newPunches.length.toLocaleString()}\nDuplicates skipped: ${duplicateCount.toLocaleString()}${unmappedCount > 0 ? `\nUnmapped Person IDs: ${unmappedCount.toLocaleString()}` : ''}`;
+
+    console.log(`\n[Hikvision Diagnostic] Attendance Processing Complete:`);
+    console.log(`- Total Hikvision events fetched: ${totalDownloaded}`);
+    console.log(`- New records imported: ${newRecordsCount}`);
+    console.log(`- Historical records re-linked to employee: ${relinkedCount}`);
+    console.log(`- Duplicate records skipped: ${duplicateCount}`);
+    console.log(`- Unmapped employee events: ${unmappedCount}`);
+    console.log(`- Unique User IDs in Hikvision logs: ${Array.from(userIdsFound).join(', ')}`);
+    console.log(`- Filtered count & reasons summary: ${filterReasons.length} items skipped (duplicates or invalid timestamps)`);
+
+    const finalSummaryMessage = `Attendance synchronization completed.
+
+Total Hikvision events found: ${totalDownloaded.toLocaleString()}
+New events imported: ${newRecordsCount.toLocaleString()}${relinkedCount > 0 ? `\nHistorical events re-linked: ${relinkedCount.toLocaleString()}` : ''}
+Duplicate events skipped: ${duplicateCount.toLocaleString()}
+Unmapped employee events: ${unmappedCount.toLocaleString()}`;
 
     return {
       success: true,
       message: finalSummaryMessage,
       totalFetched: totalDownloaded,
-      newRecordsCount: newPunches.length,
+      newRecordsCount: newRecordsCount + relinkedCount,
       duplicateRecordsCount: duplicateCount,
       unmappedCount,
-      punches: newPunches
+      punches: newOrUpdatedPunches
     };
   }
 }

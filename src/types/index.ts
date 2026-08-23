@@ -121,6 +121,8 @@ export interface ProcessedAttendance {
   otHours: number;
   lateMinutes: number;
   earlyLeaveMinutes: number;
+  shortLeaveMinutes?: number;
+  timeLossMinutes?: number;
   status: AttendanceStatus;
   leaveTypeId?: string;
   isManualCorrection: boolean;
@@ -238,6 +240,9 @@ export interface CalculatedSalaryRecord {
   unpaidLeaveDays: number;
   otHours: number;
   lateMinutes: number;
+  shortLeaveMinutes?: number;
+  timeLossMinutes?: number;
+  shortLeaveDeduction?: number;
 
   // Earnings
   basicSalary: number;
@@ -357,3 +362,33 @@ export interface AuditLog {
   module?: string;
   details: string;
 }
+
+export type HolidayType = 'Poya' | 'Public' | 'Mercantile';
+
+export interface Holiday {
+  id: string;
+  date: string; // YYYY-MM-DD
+  name: string;
+  nameSinhala?: string;
+  nameTamil?: string;
+  type: HolidayType;
+  year: number;
+}
+
+export interface MonthlyWorkingDaysConfig {
+  id: string;
+  year: number;
+  month: string; // YYYY-MM
+  calendarDays: number;
+  sundaysCount: number;
+  poyaCount: number;
+  publicHolidayCount: number;
+  mercantileHolidayCount: number;
+  autoWorkingDays: number;
+  manualOverride: boolean;
+  manualWorkingDays: number;
+  finalWorkingDays: number;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+

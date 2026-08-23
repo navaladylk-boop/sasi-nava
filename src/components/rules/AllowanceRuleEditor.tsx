@@ -10,6 +10,7 @@ import {
   Zap
 } from 'lucide-react';
 import { AllowanceDeductionRule, AllowanceDeductionTier, Language } from '../../types';
+import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
 import { PayrollEngine } from '../../services/payrollEngine';
 
@@ -17,12 +18,14 @@ interface AllowanceRuleEditorProps {
   language: Language;
   rules: AllowanceDeductionRule[];
   onSaveRule: (rule: AllowanceDeductionRule) => void;
+  onBack?: () => void;
 }
 
 export const AllowanceRuleEditor: React.FC<AllowanceRuleEditorProps> = ({
   language,
   rules,
-  onSaveRule
+  onSaveRule,
+  onBack
 }) => {
   const t = translations[language];
 
@@ -95,6 +98,9 @@ export const AllowanceRuleEditor: React.FC<AllowanceRuleEditorProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            {onBack && <BackButton onClick={onBack} />}
+          </div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2">
             <Sliders className="w-5 h-5 text-[#005a9e]" />
             {t.allowanceRules}

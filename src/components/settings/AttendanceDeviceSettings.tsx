@@ -16,6 +16,7 @@ import {
   Lock
 } from 'lucide-react';
 import { FingerprintDevice, RawAttendancePunch, Employee, Language } from '../../types';
+import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
 import { HikvisionService, HikvisionSyncReport } from '../../services/hikvisionService';
 import { HikvisionDeviceTestResult } from '../../types/electron';
@@ -28,6 +29,7 @@ interface AttendanceDeviceSettingsProps {
   onSaveDevice: (device: Partial<FingerprintDevice>) => void;
   onPunchesDownloaded: (punches: RawAttendancePunch[]) => void;
   onUpdateEmployee: (emp: Partial<Employee>) => void;
+  onBack?: () => void;
 }
 
 export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> = ({
@@ -37,7 +39,8 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
   employees,
   onSaveDevice,
   onPunchesDownloaded,
-  onUpdateEmployee
+  onUpdateEmployee,
+  onBack
 }) => {
   const t = translations[language];
 
@@ -258,7 +261,11 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
   };
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="flex-1 p-6 overflow-y-auto bg-[#f0f2f5] text-[#111827] space-y-6 font-sans">
+      <div className="flex items-center gap-2">
+        {onBack && <BackButton onClick={onBack} />}
+      </div>
+
       {/* Save Success Alert */}
       {saveSuccess && (
         <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-xs">

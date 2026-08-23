@@ -1,15 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Printer,
-  FileText,
-  Building2,
   ChevronLeft,
   ChevronRight,
-  Filter,
-  CheckCircle2,
-  User,
-  ShieldAlert,
-  Layers
+  Users,
+  CheckSquare,
+  Square,
+  Layers,
+  CheckCircle2
 } from 'lucide-react';
 import {
   PayrollPeriod,
@@ -18,6 +16,7 @@ import {
   Employee,
   CalculatedSalaryRecord
 } from '../../types';
+import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
 
 interface PayslipQuadViewProps {
@@ -26,6 +25,7 @@ interface PayslipQuadViewProps {
   payrollPeriod?: PayrollPeriod;
   settings: CompanySettings;
   employees: Employee[];
+  onBack?: () => void;
 }
 
 export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
@@ -33,22 +33,43 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
   currentMonth,
   payrollPeriod,
   settings,
-  employees
+  employees,
+  onBack
 }) => {
   const t = translations[language];
 
   const [currentPage, setCurrentPage] = useState<number>(0);
-  const [selectedEmpId, setSelectedEmpId] = useState<string>('ALL');
+  const [selectedEmpIds, setSelectedEmpIds] = useState<string[]>([]);
   const [showSinhala, setShowSinhala] = useState<boolean>(true);
   const [showTamil, setShowTamil] = useState<boolean>(true);
 
   const records = payrollPeriod?.records || [];
 
-  // Filter records if specific employee selected
-  const displayedRecords =
-    selectedEmpId === 'ALL'
-      ? records
-      : records.filter(r => r.employeeId === selectedEmpId);
+  // Automatically select all employees when records load or change
+  useEffect(() => {
+    if (records.length > 0) {
+      setSelectedEmpIds(records.map(r => r.employeeId));
+    }
+  }, [payrollPeriod]);
+
+  const handleSelectAll = () => {
+    setSelectedEmpIds(records.map(r => r.employeeId));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedEmpIds([]);
+  };
+
+  const toggleSelectEmployee = (empId: string) => {
+    if (selectedEmpIds.includes(empId)) {
+      setSelectedEmpIds(selectedEmpIds.filter(id => id !== empId));
+    } else {
+      setSelectedEmpIds([...selectedEmpIds, empId]);
+    }
+  };
+
+  // Filter records based on selected employees
+  const displayedRecords = records.filter(r => selectedEmpIds.includes(r.employeeId));
 
   // Chunk displayed records into groups of 4 (4-per-A4 page)
   const pageSize = 4;
@@ -131,9 +152,9 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
               <div className="font-bold uppercase text-[9px] text-slate-600 border-b border-slate-200 pb-0.5">
                 Earnings (Rs.)
               </div>
-              <div className="flex justify-between">
-                <span>Basic Salary:</span>
-                <span className="font-mono font-semibold">{(record.basicSalary ?? 0).toLocaleString()}</span>
+              <div className="flex justify-between text-slate-500 text-[9px]">
+                <span>Original Basic:</span>
+                <span className="font-mono">{(record.basicSalary ?? 0).toLocaleString()}</span>
               </div>
               {(record.noPayBasicDeduction ?? 0) > 0 && (
                 <div className="flex justify-between text-rose-600 text-[9px]">
@@ -141,7 +162,13 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
                   <span className="font-mono">-{(record.noPayBasicDeduction ?? 0).toLocaleString()}</span>
                 </div>
               )}
-              <div className="flex justify-between">
+              <div className="flex justify-between font-bold text-slate-900 bg-slate-50 px-1 py-0.5 rounded border border-slate-200 text-[10px]">
+                <span>Earned Basic:</span>
+                <span className="font-mono font-bold text-blue-900">
+                  Rs. {(record.netBasicSalary ?? 0).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between text-[10px] pt-0.5">
                 <span>Fixed Allowance:</span>
                 <span className="font-mono">{(record.totalAllowances ?? 0).toLocaleString()}</span>
               </div>
@@ -152,19 +179,19 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
                 </div>
               )}
               {(record.otAmount ?? 0) > 0 && (
-                <div className="flex justify-between text-amber-700">
+                <div className="flex justify-between text-amber-700 text-[10px]">
                   <span>OT ({record.otHours || 0} hrs):</span>
                   <span className="font-mono font-semibold">+{(record.otAmount ?? 0).toLocaleString()}</span>
                 </div>
               )}
               {(record.incentives ?? 0) > 0 && (
-                <div className="flex justify-between text-emerald-700">
+                <div className="flex justify-between text-emerald-700 text-[10px]">
                   <span>Incentives:</span>
                   <span className="font-mono">+{(record.incentives ?? 0).toLocaleString()}</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold border-t border-slate-300 pt-0.5 text-slate-900 mt-1">
-                <span>Gross Salary:</span>
+              <div className="flex justify-between font-bold border-t border-slate-300 pt-0.5 text-slate-900 mt-1 text-[10px]">
+                <span>Gross Earnings:</span>
                 <span className="font-mono">Rs. {(record.grossSalary ?? 0).toLocaleString()}</span>
               </div>
             </div>
@@ -174,29 +201,35 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
               <div className="font-bold uppercase text-[9px] text-slate-600 border-b border-slate-200 pb-0.5">
                 Deductions (Rs.)
               </div>
-              <div className="flex justify-between text-blue-800">
+              <div className="flex justify-between text-blue-800 text-[10px]">
                 <span>EPF (8%):</span>
                 <span className="font-mono font-semibold">-{(record.epfEmployeeAmount ?? 0).toLocaleString()}</span>
               </div>
               {(record.salaryAdvance ?? 0) > 0 && (
-                <div className="flex justify-between text-rose-700">
+                <div className="flex justify-between text-rose-700 text-[10px]">
                   <span>Salary Advance:</span>
                   <span className="font-mono">-{(record.salaryAdvance ?? 0).toLocaleString()}</span>
                 </div>
               )}
               {(record.loanDeductions ?? 0) > 0 && (
-                <div className="flex justify-between text-rose-700">
+                <div className="flex justify-between text-rose-700 text-[10px]">
                   <span>Loan Recovery:</span>
                   <span className="font-mono">-{(record.loanDeductions ?? 0).toLocaleString()}</span>
                 </div>
               )}
+              {(record.shortLeaveDeduction ?? 0) > 0 && (
+                <div className="flex justify-between text-rose-700 text-[10px]">
+                  <span>Short Leave/Time Loss:</span>
+                  <span className="font-mono">-{(record.shortLeaveDeduction ?? 0).toLocaleString()}</span>
+                </div>
+              )}
               {(record.otherDeductions ?? 0) > 0 && (
-                <div className="flex justify-between text-rose-700">
+                <div className="flex justify-between text-rose-700 text-[10px]">
                   <span>Other Deductions:</span>
                   <span className="font-mono">-{(record.otherDeductions ?? 0).toLocaleString()}</span>
                 </div>
               )}
-              <div className="flex justify-between font-bold border-t border-slate-300 pt-0.5 text-rose-800 mt-1">
+              <div className="flex justify-between font-bold border-t border-slate-300 pt-0.5 text-rose-800 mt-1 text-[10px]">
                 <span>Total Deductions:</span>
                 <span className="font-mono">-Rs. {(record.totalDeductions ?? 0).toLocaleString()}</span>
               </div>
@@ -245,6 +278,9 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
       {/* Action Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            {onBack && <BackButton onClick={onBack} />}
+          </div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2">
             <Printer className="w-5 h-5 text-[#005a9e]" />
             {t.payslips} - <span className="font-mono text-[#005a9e]">4-in-1 A4 Layout</span>
@@ -279,34 +315,91 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
 
           <button
             id="print-all-payslips-btn"
+            disabled={selectedEmpIds.length === 0}
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#005a9e] hover:bg-[#004880] text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#005a9e] hover:bg-[#004880] disabled:opacity-40 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
-            {t.print4OnA4}
+            {t.print4OnA4} ({selectedEmpIds.length})
           </button>
         </div>
       </div>
 
-      {/* Page Navigation & Filter Bar (No Print) */}
+      {/* Selected Employee Checklist & Action Controls */}
+      <div className="bg-white border border-[#d1d5db] rounded-xl p-4 space-y-3 no-print shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#e5e7eb]">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-[#005a9e]" />
+            <span className="font-bold text-xs text-[#111827]">
+              Select Employees for Printing ({selectedEmpIds.length} of {records.length} selected)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSelectAll}
+              className="px-3 py-1 bg-[#f0f9ff] hover:bg-blue-100 text-[#005a9e] border border-blue-200 rounded text-xs font-semibold cursor-pointer transition-colors"
+            >
+              Select All
+            </button>
+            <button
+              onClick={handleClearSelection}
+              className="px-3 py-1 bg-white hover:bg-gray-100 text-[#4b5563] border border-[#d1d5db] rounded text-xs font-semibold cursor-pointer transition-colors"
+            >
+              Clear Selection
+            </button>
+            <button
+              id="print-selected-payslips-btn"
+              disabled={selectedEmpIds.length === 0}
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-[#005a9e] hover:bg-[#004880] disabled:opacity-40 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              Print Selected Payslips ({selectedEmpIds.length})
+            </button>
+          </div>
+        </div>
+
+        {/* Checkbox Matrix for Individual Employee Selection */}
+        {records.length === 0 ? (
+          <div className="text-xs text-[#9ca3af] py-2">
+            No calculated employees available for {currentMonth}. Go to "Payroll" screen and click "Calculate Salary".
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 max-h-36 overflow-y-auto p-1">
+            {records.map(r => {
+              const isSelected = selectedEmpIds.includes(r.employeeId);
+              return (
+                <label
+                  key={r.employeeId}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-colors select-none ${
+                    isSelected
+                      ? 'bg-blue-50/80 border-[#005a9e] text-[#005a9e] font-semibold'
+                      : 'bg-white border-[#d1d5db] text-[#4b5563] hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelectEmployee(r.employeeId)}
+                    className="rounded text-[#005a9e] focus:ring-[#005a9e]"
+                  />
+                  <span className="font-mono text-[11px] font-bold">{r.employeeCode}</span>
+                  <span className="truncate">{r.employeeName}</span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Page Navigation Switcher (No Print) */}
       <div className="bg-white border border-[#d1d5db] rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 no-print text-xs shadow-xs">
         <div className="flex items-center gap-2">
-          <Filter className="w-3.5 h-3.5 text-[#6b7280]" />
-          <select
-            value={selectedEmpId}
-            onChange={e => {
-              setSelectedEmpId(e.target.value);
-              setCurrentPage(0);
-            }}
-            className="bg-white border border-[#d1d5db] rounded-lg px-2.5 py-1.5 text-[#111827] focus:outline-none focus:border-[#005a9e]"
-          >
-            <option value="ALL">All Employees (4 per A4 page)</option>
-            {employees.map(e => (
-              <option key={e.id} value={e.id}>
-                {e.employeeCode} - {e.fullName}
-              </option>
-            ))}
-          </select>
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <span className="text-[#374151]">
+            Showing <strong>{displayedRecords.length}</strong> selected payslips in 4-per-A4 grid format
+          </span>
         </div>
 
         {/* Page Switcher */}
@@ -339,9 +432,9 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
             <span>Interactive 4-Quadrant A4 Sheet Preview (Page {currentPage + 1} of {totalPages})</span>
           </div>
 
-          {records.length === 0 ? (
+          {displayedRecords.length === 0 ? (
             <div className="text-center py-16 text-[#9ca3af] text-xs">
-              No calculated payroll records found for {currentMonth}. Go to "Payroll" screen and click "Calculate Salary" first.
+              No employees selected for print preview. Please select at least one employee from the list above.
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -364,6 +457,7 @@ export const PayslipQuadView: React.FC<PayslipQuadViewProps> = ({
       <div className="hidden print-only">
         {Array.from({ length: totalPages }).map((_, pageIdx) => {
           const pageItems = displayedRecords.slice(pageIdx * 4, (pageIdx + 1) * 4);
+          if (pageItems.length === 0) return null;
           return (
             <div
               key={`print-page-${pageIdx}`}

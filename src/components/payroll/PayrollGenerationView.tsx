@@ -11,7 +11,8 @@ import {
   TrendingUp,
   Landmark,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Sliders
 } from 'lucide-react';
 import {
   Employee,
@@ -29,6 +30,8 @@ import {
 } from '../../types';
 import { translations } from '../../i18n/translations';
 import { PayrollEngine } from '../../services/payrollEngine';
+import { DatabaseService } from '../../services/db';
+import { BackButton } from '../common/NavigationButtons';
 import { ActiveTab } from '../layout/SidebarNav';
 
 interface PayrollGenerationViewProps {
@@ -47,6 +50,7 @@ interface PayrollGenerationViewProps {
   payrollCategories?: PayrollCategory[];
   onSavePayrollPeriod: (period: PayrollPeriod) => void;
   onNavigate: (tab: ActiveTab) => void;
+  onBack?: () => void;
 }
 
 export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
@@ -64,7 +68,8 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
   incentives = [],
   payrollCategories = [],
   onSavePayrollPeriod,
-  onNavigate
+  onNavigate,
+  onBack
 }) => {
   const t = translations[language];
 
@@ -74,10 +79,13 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
 
   const handleCalculatePayroll = () => {
     setIsCalculating(true);
+    const workingDaysConfig = DatabaseService.getMonthlyWorkingDaysConfig(currentMonth);
+    const finalWorkingDays = workingDaysConfig.finalWorkingDays;
+
     setCalculationStep('Step 1: Reading biometric attendance & leave records...');
 
     setTimeout(() => {
-      setCalculationStep('Step 2: Computing basic daily deductions (Basic ÷ 25)...');
+      setCalculationStep(`Step 2: Computing basic daily deductions (Basic ÷ ${finalWorkingDays} working days)...`);
       setTimeout(() => {
         setCalculationStep('Step 3: Evaluating Tiered Allowance deduction matrix...');
         setTimeout(() => {
@@ -113,13 +121,15 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
               // Total unpaid/no-pay days (max of attendance absence or leave requests)
               const totalUnpaidDays = Math.max(noPayDaysFromAtt, noPayLeaveDays);
 
-              const standardWorkingDays = emp.workingDaysPerMonth || settings.defaultWorkingDaysPerMonth || 25;
+              const standardWorkingDays = finalWorkingDays;
               const calculatedWorkedDays = workedDaysFromAtt > 0
                 ? workedDaysFromAtt
                 : Math.max(0, standardWorkingDays - totalUnpaidDays);
 
               const otHours = empAtt.reduce((sum, a) => sum + (Number(a.otHours) || 0), 0);
               const lateMins = empAtt.reduce((sum, a) => sum + (Number(a.lateMinutes) || 0), 0);
+              const shortLeaveMins = empAtt.reduce((sum, a) => sum + (Number(a.shortLeaveMinutes) || 0), 0);
+              const timeLossMins = empAtt.reduce((sum, a) => sum + (Number(a.timeLossMinutes) || 0), 0);
 
               // Read real approved incentives from DB
               const employeeIncentives = incentives.filter(
@@ -136,6 +146,8 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
                 unpaidLeaveDays: totalUnpaidDays,
                 otHours,
                 lateMinutes: lateMins,
+                shortLeaveMinutes: shortLeaveMins,
+                timeLossMinutes: timeLossMins,
                 incentiveAmount: realIncentiveTotal > 0 ? realIncentiveTotal : (existingRecord?.incentives || 0),
                 loanDeduction: existingRecord?.loanDeductions || 0,
                 advanceDeduction: existingRecord?.salaryAdvance || 0,
@@ -144,7 +156,8 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
                 rules: allowanceRules,
                 categories: payrollCategories,
                 departments,
-                designations
+                designations,
+                monthlyWorkingDays: finalWorkingDays
               });
 
               calculatedRecords.push({
@@ -199,18 +212,26 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
     const emp = employees.find(emp => emp.id === editingRecord.employeeId);
     if (!emp) return;
 
+    const workingDaysConfig = DatabaseService.getMonthlyWorkingDaysConfig(currentMonth);
+    const finalWorkingDays = workingDaysConfig.finalWorkingDays;
+    const standardWorkingDays = finalWorkingDays;
+    const adjustedWorkedDays = Math.max(0, standardWorkingDays - editingRecord.unpaidLeaveDays);
+
     const calc = PayrollEngine.calculateEmployeeSalary({
       employee: emp,
-      workedDays: editingRecord.workedDays,
+      workedDays: adjustedWorkedDays,
       unpaidLeaveDays: editingRecord.unpaidLeaveDays,
       otHours: editingRecord.otHours,
-      lateMinutes: 0,
+      lateMinutes: editingRecord.lateMinutes || 0,
+      shortLeaveMinutes: editingRecord.shortLeaveMinutes || 0,
+      timeLossMinutes: editingRecord.timeLossMinutes || 0,
       incentiveAmount: editingRecord.incentives,
       loanDeduction: editingRecord.loanDeductions,
       advanceDeduction: editingRecord.salaryAdvance,
       otherDeductions: editingRecord.otherDeductions,
       settings,
-      rules: allowanceRules
+      rules: allowanceRules,
+      monthlyWorkingDays: finalWorkingDays
     });
 
     const updatedRecords = payrollPeriod.records.map(r =>
@@ -243,6 +264,9 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
       {/* Top Header & Calculation Launcher */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            {onBack && <BackButton onClick={onBack} />}
+          </div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2">
             <Calculator className="w-5 h-5 text-[#005a9e]" />
             {t.monthlyPayroll}
@@ -301,6 +325,39 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
           <div className="font-mono text-[11px] text-blue-700">{calculationStep}</div>
         </div>
       )}
+
+      {/* Monthly Working Days Info Bar */}
+      {(() => {
+        const workingDaysCfg = DatabaseService.getMonthlyWorkingDaysConfig(currentMonth);
+        return (
+          <div className="bg-white border border-[#e5e7eb] rounded-xl p-4 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-50 text-[#005a9e] rounded-lg">
+                <Sliders className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-[#111827] flex items-center gap-2">
+                  Working Days for {currentMonth}: <span className="text-sm font-mono text-[#005a9e]">{workingDaysCfg.finalWorkingDays} Days</span>
+                  {workingDaysCfg.manualOverride && (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-semibold">Manual Override Active</span>
+                  )}
+                </div>
+                <div className="text-[11px] text-[#6b7280] mt-0.5">
+                  Calendar Days: {workingDaysCfg.calendarDays} | Sundays: {workingDaysCfg.sundaysCount} | Poya: {workingDaysCfg.poyaCount} | Public: {workingDaysCfg.publicHolidayCount} | Mercantile: {workingDaysCfg.mercantileHolidayCount} (Formula: Total - Non-Working)
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onNavigate('settings')}
+              className="px-3 py-1.5 bg-[#f3f4f6] hover:bg-[#e5e7eb] text-[#374151] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              Configure Working Days & Holidays
+            </button>
+          </div>
+        );
+      })()}
 
       {/* Monthly Summary Statistics Cards */}
       {payrollPeriod && payrollPeriod.records && payrollPeriod.records.length > 0 && (
@@ -455,9 +512,13 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
                       -{(rec.epfEmployeeAmount ?? 0).toLocaleString()}
                     </td>
                     <td className="py-2.5 px-3 text-right text-red-600">
-                      {((rec.loanDeductions ?? 0) + (rec.salaryAdvance ?? 0) + (rec.otherDeductions ?? 0)) > 0
-                        ? `-${((rec.loanDeductions ?? 0) + (rec.salaryAdvance ?? 0) + (rec.otherDeductions ?? 0)).toLocaleString()}`
-                        : '-'}
+                      {((rec.loanDeductions ?? 0) + (rec.salaryAdvance ?? 0) + (rec.otherDeductions ?? 0) + (rec.shortLeaveDeduction ?? 0)) > 0 ? (
+                        <span title={`Loan: ${(rec.loanDeductions ?? 0).toLocaleString()} | Advance: ${(rec.salaryAdvance ?? 0).toLocaleString()} | Short Leave: ${(rec.shortLeaveDeduction ?? 0).toLocaleString()} | Other: ${(rec.otherDeductions ?? 0).toLocaleString()}`}>
+                          -{( (rec.loanDeductions ?? 0) + (rec.salaryAdvance ?? 0) + (rec.otherDeductions ?? 0) + (rec.shortLeaveDeduction ?? 0) ).toLocaleString()}
+                        </span>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                     <td className="py-2.5 px-3 text-right font-bold text-emerald-700 bg-emerald-50/50">
                       Rs. {(rec.netSalary ?? 0).toLocaleString()}

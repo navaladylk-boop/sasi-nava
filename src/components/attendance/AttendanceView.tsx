@@ -22,6 +22,7 @@ import {
   CompanySettings,
   EmployeeLeave
 } from '../../types';
+import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
 import { AttendanceProcessor } from '../../services/attendanceProcessor';
 
@@ -36,6 +37,7 @@ interface AttendanceViewProps {
   settings: CompanySettings;
   onSaveAttendanceBatch: (records: ProcessedAttendance[]) => void;
   onUpdateSingleAttendance: (id: string, updates: Partial<ProcessedAttendance>) => void;
+  onBack?: () => void;
 }
 
 export const AttendanceView: React.FC<AttendanceViewProps> = ({
@@ -48,7 +50,8 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
   leaves,
   settings,
   onSaveAttendanceBatch,
-  onUpdateSingleAttendance
+  onUpdateSingleAttendance,
+  onBack
 }) => {
   const t = translations[language];
 
@@ -151,6 +154,9 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            {onBack && <BackButton onClick={onBack} />}
+          </div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2">
             <CalendarCheck className="w-5 h-5 text-[#005a9e]" />
             {t.attendanceProcessing}

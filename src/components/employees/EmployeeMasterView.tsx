@@ -21,6 +21,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Employee, Department, Designation, PayrollCategory, Language } from '../../types';
+import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
 
 interface EmployeeMasterViewProps {
@@ -31,6 +32,7 @@ interface EmployeeMasterViewProps {
   payrollCategories: PayrollCategory[];
   onSaveEmployee: (emp: Partial<Employee>) => Promise<Employee> | void;
   onDeleteEmployee: (id: string) => Promise<void> | void;
+  onBack?: () => void;
 }
 
 export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
@@ -40,7 +42,8 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
   designations,
   payrollCategories,
   onSaveEmployee,
-  onDeleteEmployee
+  onDeleteEmployee,
+  onBack
 }) => {
   const t = translations[language];
 
@@ -230,6 +233,9 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
       {/* Header & Action Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            {onBack && <BackButton onClick={onBack} />}
+          </div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2">
             <Users className="w-5 h-5 text-[#005a9e]" />
             {t.employeeMaster}

@@ -17,6 +17,7 @@ import {
   Language,
   Employee
 } from '../../types';
+import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
 
 interface EpfEtfManagementViewProps {
@@ -27,6 +28,7 @@ interface EpfEtfManagementViewProps {
   settings: CompanySettings;
   employees: Employee[];
   onSavePayrollPeriod: (period: PayrollPeriod) => void;
+  onBack?: () => void;
 }
 
 export const EpfEtfManagementView: React.FC<EpfEtfManagementViewProps> = ({
@@ -36,7 +38,8 @@ export const EpfEtfManagementView: React.FC<EpfEtfManagementViewProps> = ({
   payrollPeriod,
   settings,
   employees,
-  onSavePayrollPeriod
+  onSavePayrollPeriod,
+  onBack
 }) => {
   const t = translations[language];
 
@@ -89,6 +92,9 @@ export const EpfEtfManagementView: React.FC<EpfEtfManagementViewProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            {onBack && <BackButton onClick={onBack} />}
+          </div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2">
             <Landmark className="w-5 h-5 text-[#005a9e]" />
             {t.epfEtfManagement} - <span className="font-mono text-[#005a9e]">{currentMonth}</span>

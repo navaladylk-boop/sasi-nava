@@ -14,7 +14,10 @@ import {
   CompanySettings,
   AuditLog,
   UserRole,
-  IncentiveRecord
+  IncentiveRecord,
+  Holiday,
+  HolidayType,
+  MonthlyWorkingDaysConfig
 } from '../types';
 
 export interface DatabaseState {
@@ -35,6 +38,8 @@ export interface DatabaseState {
   payrollCategories: PayrollCategory[];
   payrollPeriods: PayrollPeriod[];
   auditLogs: AuditLog[];
+  holidays: Holiday[];
+  monthlyWorkingDays: MonthlyWorkingDaysConfig[];
 }
 
 const STORAGE_KEY = 'LANKA_HR_DATABASE_V3';
@@ -156,6 +161,30 @@ export const defaultDevices: FingerprintDevice[] = [
   }
 ];
 
+export const defaultHolidays: Holiday[] = [
+  { id: 'hol-2026-01-03', date: '2026-01-03', name: 'Duruthu Full Moon Poya Day', nameSinhala: 'දුරුතු පුර පසොළොස්වක පෝය දිනය', nameTamil: 'துருத்து பௌர்ணமி பூசை நாள்', type: 'Poya', year: 2026 },
+  { id: 'hol-2026-01-14', date: '2026-01-14', name: 'Tamil Thai Pongal Day', nameSinhala: 'තයි පොංගල් දිනය', nameTamil: 'தை பொங்கல் திருநாள்', type: 'Public', year: 2026 },
+  { id: 'hol-2026-02-01', date: '2026-02-01', name: 'Navam Full Moon Poya Day', nameSinhala: 'නාවම් පුර පසොළොස්වක පෝය දිනය', nameTamil: 'நவம் பௌர்ணமி பூசை நாள்', type: 'Poya', year: 2026 },
+  { id: 'hol-2026-02-04', date: '2026-02-04', name: 'National Independence Day', nameSinhala: 'ජාතික නිදහස් දිනය', nameTamil: 'சுதந்திர தினம்', type: 'Public', year: 2026 },
+  { id: 'hol-2026-03-02', date: '2026-03-02', name: 'Medin Full Moon Poya Day', nameSinhala: 'මැදින් පුර පසොළොස්වක පෝය දිනය', nameTamil: 'மேதின் பௌர்ணமி பூசை நாள்', type: 'Poya', year: 2026 },
+  { id: 'hol-2026-03-30', date: '2026-03-30', name: 'Mahasivarathri Day', nameSinhala: 'මහා සිව්රාත්‍රි දිනය', nameTamil: 'மகா சிவராத்திரி நாள்', type: 'Public', year: 2026 },
+  { id: 'hol-2026-04-01', date: '2026-04-01', name: 'Bak Full Moon Poya Day', nameSinhala: 'බක් පුර පසොළොස්වක පෝය දිනය', nameTamil: 'பக் பௌர்ணமி பூசை நாள்', type: 'Poya', year: 2026 },
+  { id: 'hol-2026-04-03', date: '2026-04-03', name: 'Good Friday', nameSinhala: 'මහ සිකුරාදා දිනය', nameTamil: 'புனித வெள்ளி', type: 'Public', year: 2026 },
+  { id: 'hol-2026-04-13', date: '2026-04-13', name: 'Day Prior to Sinhala & Tamil New Year Day', nameSinhala: 'සිංහල හා දෙමළ අලුත් අවුරුදු දිනට පෙර දිනය', nameTamil: 'புத்தாண்டுக்கு முந்தைய நாள்', type: 'Public', year: 2026 },
+  { id: 'hol-2026-04-14', date: '2026-04-14', name: 'Sinhala & Tamil New Year Day', nameSinhala: 'සිංහල හා දෙමළ අලුත් අවුරුදු දිනය', nameTamil: 'சித்திரைப் புத்தாண்டு நாள்', type: 'Public', year: 2026 },
+  { id: 'hol-2026-05-01', date: '2026-05-01', name: 'May Day (Workers Day) & Vesak Poya', nameSinhala: 'මැයි දිනය හා වෙසක් පුර පසොළොස්වක පෝය දිනය', nameTamil: 'மே தினம் & வைகாசி விசாகம்', type: 'Public', year: 2026 },
+  { id: 'hol-2026-05-02', date: '2026-05-02', name: 'Day Following Vesak Full Moon Poya Day', nameSinhala: 'වෙසක් පෝය දිනයට පසු දිනය', nameTamil: 'வைகாசி விசாக மறுநாள்', type: 'Public', year: 2026 },
+  { id: 'hol-2026-05-31', date: '2026-05-31', name: 'Poson Full Moon Poya Day', nameSinhala: 'පොසොන් පුර පසොළොස්වක පෝය දිනය', nameTamil: 'போசொன் பௌர்ணமி பூசை நாள்', type: 'Poya', year: 2026 },
+  { id: 'hol-2026-06-29', date: '2026-06-29', name: 'Esala Full Moon Poya Day', nameSinhala: 'ඇසළ පුර පසොළොස්වක පෝය දිනය', nameTamil: 'ஆட பௌர்ணமி பூசை நாள்', type: 'Poya', year: 2026 },
+  { id: 'hol-2026-07-28', date: '2026-07-28', name: 'Nikini Full Moon Poya Day', nameSinhala: 'නිකිණි පුර පසොළොස්වක පෝය දිනය', nameTamil: 'நிகிணி பௌர்ணமி பூசை நாள்', type: 'Poya', year: 2026 },
+  { id: 'hol-2026-08-27', date: '2026-08-27', name: 'Binara Full Moon Poya Day', nameSinhala: 'බිනර පුර පසොළොස්වක පෝය දිනය', nameTamil: 'பினர பௌர்ணமி பூசை நாள்', type: 'Poya', year: 2026 },
+  { id: 'hol-2026-09-26', date: '2026-09-26', name: 'Vap Full Moon Poya Day', nameSinhala: 'වප් පුර පසොළොස්වක පෝය දිනය', nameTamil: 'வப் பௌர்ணமி பூசை நாள்', type: 'Poya', year: 2026 },
+  { id: 'hol-2026-10-25', date: '2026-10-25', name: 'Il Full Moon Poya Day', nameSinhala: 'ඉල් පුර පසොළොස්වක පෝය දිනය', nameTamil: 'இல் பௌர்ணமி பூசை நாள்', type: 'Poya', year: 2026 },
+  { id: 'hol-2026-11-08', date: '2026-11-08', name: 'Deepavali Festival Day', nameSinhala: 'දීපවාලි උත්සව දිනය', nameTamil: 'தீபாவளி திருநாள்', type: 'Public', year: 2026 },
+  { id: 'hol-2026-11-24', date: '2026-11-24', name: 'Unduwap Full Moon Poya Day', nameSinhala: 'උඳුවප් පුර පසොළොස්වක පෝය දිනය', nameTamil: 'உண்டுவப் பௌர்ணமி பூசை நாள்', type: 'Poya', year: 2026 },
+  { id: 'hol-2026-12-25', date: '2026-12-25', name: 'Christmas Day', nameSinhala: 'නත්තල් දිනය', nameTamil: 'கிறிஸ்துமஸ் தினம்', type: 'Mercantile', year: 2026 }
+];
+
 function getInitialDatabase(): DatabaseState {
   const initialAuditLogs: AuditLog[] = [
     {
@@ -164,7 +193,7 @@ function getInitialDatabase(): DatabaseState {
       user: 'Admin',
       userRole: 'Admin',
       action: 'SYSTEM_INIT',
-      details: 'Clean SQLite database initialized with Sri Lankan statutory framework.'
+      details: 'Clean SQLite database initialized with Sri Lankan statutory framework & holiday calendar.'
     }
   ];
 
@@ -188,7 +217,9 @@ function getInitialDatabase(): DatabaseState {
     allowanceRules: defaultAllowanceRules,
     payrollCategories: defaultCategories,
     payrollPeriods: [],
-    auditLogs: initialAuditLogs
+    auditLogs: initialAuditLogs,
+    holidays: defaultHolidays,
+    monthlyWorkingDays: []
   };
 }
 
@@ -220,6 +251,8 @@ export class DatabaseService {
           loaded.incentives = loaded.incentives || [];
           loaded.payrollPeriods = loaded.payrollPeriods || [];
           loaded.auditLogs = loaded.auditLogs || [];
+          loaded.holidays = loaded.holidays?.length > 0 ? loaded.holidays : defaultHolidays;
+          loaded.monthlyWorkingDays = loaded.monthlyWorkingDays || [];
 
           this.state = loaded as DatabaseState;
           console.log(`[DatabaseService] SQLite Database ready (${this.state.employees.length} employees).`);
@@ -256,6 +289,8 @@ export class DatabaseService {
             parsed.incentives = parsed.incentives || [];
             parsed.payrollPeriods = parsed.payrollPeriods || [];
             parsed.auditLogs = parsed.auditLogs || [];
+            parsed.holidays = parsed.holidays?.length ? parsed.holidays : defaultHolidays;
+            parsed.monthlyWorkingDays = parsed.monthlyWorkingDays || [];
             return parsed;
           }
         }
@@ -581,20 +616,80 @@ export class DatabaseService {
   }
 
   // Raw Punches
+  public static autoRelinkRawPunches(): number {
+    if (!this.state.rawPunches || !this.state.employees) return 0;
+    const employees = this.state.employees;
+
+    const normalizeId = (idStr?: string | number): string => {
+      if (idStr === undefined || idStr === null) return '';
+      return String(idStr).trim().toLowerCase().replace(/^emp-/, '').replace(/^0+/, '');
+    };
+
+    const empLookupMap = new Map<string, string>(); // normalizedId -> emp.id
+    employees.forEach(emp => {
+      if (emp.fingerprintUserId) empLookupMap.set(normalizeId(emp.fingerprintUserId), emp.id);
+      if (emp.employeeCode) empLookupMap.set(normalizeId(emp.employeeCode), emp.id);
+      if (emp.id) empLookupMap.set(normalizeId(emp.id), emp.id);
+    });
+
+    let relinked = 0;
+    this.state.rawPunches.forEach(punch => {
+      if (!punch.employeeId && punch.deviceUserId) {
+        const empId = empLookupMap.get(normalizeId(punch.deviceUserId));
+        if (empId) {
+          punch.employeeId = empId;
+          relinked++;
+        }
+      }
+    });
+
+    if (relinked > 0) {
+      console.log(`[SQLite Diagnostic] Auto-relinked ${relinked} historical raw punches to newly created/mapped employees.`);
+    }
+    return relinked;
+  }
+
   public static getRawPunches(): RawAttendancePunch[] {
-    return this.state.rawPunches || [];
+    if (!this.state.rawPunches) this.state.rawPunches = [];
+    this.autoRelinkRawPunches();
+    return this.state.rawPunches;
   }
 
   public static saveRawPunches(punches: RawAttendancePunch[], userRole: string = 'Admin'): void {
     if (!this.state.rawPunches) this.state.rawPunches = [];
-    const existingKeys = new Set(
-      this.state.rawPunches.map(p => `${p.deviceId}_${p.deviceUserId}_${p.punchTimestamp}_${p.punchType}`)
-    );
-    const newPunches = punches.filter(
-      p => !existingKeys.has(`${p.deviceId}_${p.deviceUserId}_${p.punchTimestamp}_${p.punchType}`)
-    );
-    this.state.rawPunches.push(...newPunches);
-    this.logAudit('DOWNLOAD_PUNCHES', `Downloaded ${newPunches.length} raw punches from biometric terminal.`, userRole);
+
+    const normalizeId = (idStr?: string | number): string => {
+      if (idStr === undefined || idStr === null) return '';
+      return String(idStr).trim().toLowerCase().replace(/^emp-/, '').replace(/^0+/, '');
+    };
+
+    const existingMap = new Map<string, number>();
+    this.state.rawPunches.forEach((p, idx) => {
+      const key = `${p.deviceId}_${normalizeId(p.deviceUserId)}_${p.punchTimestamp}_${p.punchType}`;
+      existingMap.set(key, idx);
+    });
+
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    punches.forEach(p => {
+      const key = `${p.deviceId}_${normalizeId(p.deviceUserId)}_${p.punchTimestamp}_${p.punchType}`;
+      const existingIdx = existingMap.get(key);
+      if (existingIdx !== undefined) {
+        if (p.employeeId && !this.state.rawPunches[existingIdx].employeeId) {
+          this.state.rawPunches[existingIdx].employeeId = p.employeeId;
+          updatedCount++;
+        }
+      } else {
+        this.state.rawPunches.push(p);
+        existingMap.set(key, this.state.rawPunches.length - 1);
+        addedCount++;
+      }
+    });
+
+    this.autoRelinkRawPunches();
+    console.log(`[SQLite Diagnostic] saveRawPunches: Added ${addedCount} new punches, updated ${updatedCount} existing punches. Total raw punches in SQLite: ${this.state.rawPunches.length}`);
+    this.logAudit('DOWNLOAD_PUNCHES', `Saved raw punches from biometric terminal (Added: ${addedCount}, Updated: ${updatedCount}).`, userRole);
     this.saveToStorage(this.state);
   }
 
@@ -665,25 +760,38 @@ export class DatabaseService {
     return this.state.employeeLeaves || [];
   }
 
-  public static saveLeave(leave: Omit<EmployeeLeave, 'id'> | EmployeeLeave, userRole: string = 'Admin'): EmployeeLeave {
+  public static async saveLeave(leave: Omit<EmployeeLeave, 'id'> | EmployeeLeave, userRole: string = 'Admin'): Promise<EmployeeLeave> {
     if (!this.state.employeeLeaves) this.state.employeeLeaves = [];
-    const existingId = (leave as EmployeeLeave).id;
-    if (existingId && this.state.employeeLeaves.some(l => l.id === existingId)) {
-      const idx = this.state.employeeLeaves.findIndex(l => l.id === existingId);
-      this.state.employeeLeaves[idx] = { ...this.state.employeeLeaves[idx], ...leave } as EmployeeLeave;
-      this.logAudit('UPDATE_LEAVE', `Updated leave record for emp ${leave.employeeId}`, userRole);
-      this.saveToStorage(this.state);
-      return this.state.employeeLeaves[idx];
+    const existingId = (leave as any).id;
+    const existingIdx = existingId ? this.state.employeeLeaves.findIndex(l => l.id === existingId) : -1;
+    const previousState = existingIdx !== -1 ? { ...this.state.employeeLeaves[existingIdx] } : null;
+
+    let savedLeave: EmployeeLeave;
+    if (existingIdx !== -1) {
+      savedLeave = { ...this.state.employeeLeaves[existingIdx], ...leave } as EmployeeLeave;
+      this.state.employeeLeaves[existingIdx] = savedLeave;
+      this.logAudit('UPDATE_LEAVE', `Updated leave record for emp ${leave.employeeId} (${savedLeave.startDate} to ${savedLeave.endDate})`, userRole);
     } else {
-      const newLeave: EmployeeLeave = {
-        ...leave,
-        id: `leave-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`
+      savedLeave = {
+        ...(leave as any),
+        id: (leave as any).id || `leave-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        appliedDate: leave.appliedDate || new Date().toISOString().substring(0, 10),
+        status: leave.status || 'APPROVED'
       };
-      this.state.employeeLeaves.push(newLeave);
-      this.logAudit('APPLY_LEAVE', `Applied leave for emp ${leave.employeeId} (${leave.daysCount} days)`, userRole);
-      this.saveToStorage(this.state);
-      return newLeave;
+      this.state.employeeLeaves.push(savedLeave);
+      this.logAudit('APPLY_LEAVE', `Applied leave for emp ${leave.employeeId} (${savedLeave.daysCount} days, ${savedLeave.startDate} to ${savedLeave.endDate})`, userRole);
     }
+
+    const saveResult = await this.saveToStorage(this.state);
+    if (!saveResult.success) {
+      if (existingIdx === -1) {
+        this.state.employeeLeaves = this.state.employeeLeaves.filter(l => l.id !== savedLeave.id);
+      } else if (previousState) {
+        this.state.employeeLeaves[existingIdx] = previousState;
+      }
+      throw new Error(saveResult.error || 'Failed to save leave to SQLite database.');
+    }
+    return savedLeave;
   }
 
   public static updateLeaveStatus(
@@ -702,10 +810,17 @@ export class DatabaseService {
     }
   }
 
-  public static deleteLeave(id: string, userRole: string = 'Admin'): void {
+  public static async deleteLeave(id: string, userRole: string = 'Admin'): Promise<void> {
+    const leaveRecord = (this.state.employeeLeaves || []).find(l => l.id === id);
+    const previousLeaves = [...(this.state.employeeLeaves || [])];
     this.state.employeeLeaves = (this.state.employeeLeaves || []).filter(l => l.id !== id);
-    this.logAudit('DELETE_LEAVE', `Deleted leave application ${id}`, userRole);
-    this.saveToStorage(this.state);
+    this.logAudit('DELETE_LEAVE', `Deleted leave application ${id} (Emp: ${leaveRecord?.employeeId}, Dates: ${leaveRecord?.startDate} to ${leaveRecord?.endDate})`, userRole);
+
+    const saveResult = await this.saveToStorage(this.state);
+    if (!saveResult.success) {
+      this.state.employeeLeaves = previousLeaves;
+      throw new Error(saveResult.error || 'Failed to delete leave from SQLite database.');
+    }
   }
 
   // Incentives Management
@@ -895,7 +1010,9 @@ export class DatabaseService {
         allowanceRules: parsed.allowanceRules || defaultAllowanceRules,
         payrollCategories: parsed.payrollCategories || defaultCategories,
         payrollPeriods: parsed.payrollPeriods || [],
-        auditLogs: parsed.auditLogs || []
+        auditLogs: parsed.auditLogs || [],
+        holidays: parsed.holidays?.length ? parsed.holidays : defaultHolidays,
+        monthlyWorkingDays: parsed.monthlyWorkingDays || []
       };
       this.saveToStorage(this.state);
       this.logAudit('RESTORE_DATABASE', `Restored database (${this.state.employees.length} employees, ${this.state.payrollPeriods.length} payroll periods).`);
@@ -903,6 +1020,147 @@ export class DatabaseService {
     } catch (err: any) {
       return { success: false, message: err.message };
     }
+  }
+
+  // Holiday Calendar & Monthly Working Days Methods
+  public static getHolidays(): Holiday[] {
+    return this.state.holidays || defaultHolidays;
+  }
+
+  public static async saveHoliday(holiday: Holiday | Omit<Holiday, 'id'>, userRole: string = 'Admin'): Promise<Holiday> {
+    if (!this.state.holidays) this.state.holidays = [...defaultHolidays];
+    const existingId = (holiday as any).id;
+    const duplicate = this.state.holidays.find(h => h.date === holiday.date && h.id !== existingId);
+    if (duplicate) {
+      throw new Error(`Holiday already exists for this date (${holiday.date}: ${duplicate.name}).`);
+    }
+
+    let saved: Holiday;
+    if (existingId && this.state.holidays.some(h => h.id === existingId)) {
+      const idx = this.state.holidays.findIndex(h => h.id === existingId);
+      saved = { ...this.state.holidays[idx], ...holiday } as Holiday;
+      this.state.holidays[idx] = saved;
+      this.logAudit('UPDATE_HOLIDAY', `Updated holiday ${saved.name} on ${saved.date}`, userRole);
+    } else {
+      saved = {
+        ...(holiday as any),
+        id: (holiday as any).id || `hol-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        year: parseInt(holiday.date.substring(0, 4), 10) || new Date().getFullYear()
+      };
+      this.state.holidays.push(saved);
+      this.logAudit('ADD_HOLIDAY', `Added holiday ${saved.name} on ${saved.date} (${saved.type})`, userRole);
+    }
+
+    await this.saveToStorage(this.state);
+    return saved;
+  }
+
+  public static async deleteHoliday(id: string, userRole: string = 'Admin'): Promise<void> {
+    const h = (this.state.holidays || []).find(x => x.id === id);
+    this.state.holidays = (this.state.holidays || []).filter(x => x.id !== id);
+    this.logAudit('DELETE_HOLIDAY', `Deleted holiday ${h?.name || id} on ${h?.date}`, userRole);
+    await this.saveToStorage(this.state);
+  }
+
+  public static calculateWorkingDaysForMonth(year: number, monthNum: number): {
+    calendarDays: number;
+    sundaysCount: number;
+    poyaCount: number;
+    publicHolidayCount: number;
+    mercantileHolidayCount: number;
+    autoWorkingDays: number;
+  } {
+    const calendarDays = new Date(year, monthNum, 0).getDate();
+    let sundaysCount = 0;
+    let poyaCount = 0;
+    let publicHolidayCount = 0;
+    let mercantileHolidayCount = 0;
+
+    const holidays = this.state.holidays || defaultHolidays;
+    const monthStr = String(monthNum).padStart(2, '0');
+    const prefix = `${year}-${monthStr}`;
+    const nonWorkingDates = new Set<string>();
+
+    for (let day = 1; day <= calendarDays; day++) {
+      const dayStr = String(day).padStart(2, '0');
+      const dateStr = `${prefix}-${dayStr}`;
+      const d = new Date(year, monthNum - 1, day);
+      const isSunday = d.getDay() === 0;
+
+      if (isSunday) {
+        sundaysCount++;
+        nonWorkingDates.add(dateStr);
+      }
+
+      const dayHolidays = holidays.filter(h => h.date === dateStr);
+      for (const h of dayHolidays) {
+        if (h.type === 'Poya') poyaCount++;
+        else if (h.type === 'Public') publicHolidayCount++;
+        else if (h.type === 'Mercantile') mercantileHolidayCount++;
+        nonWorkingDates.add(dateStr);
+      }
+    }
+
+    const autoWorkingDays = Math.max(0, calendarDays - nonWorkingDates.size);
+    return {
+      calendarDays,
+      sundaysCount,
+      poyaCount,
+      publicHolidayCount,
+      mercantileHolidayCount,
+      autoWorkingDays
+    };
+  }
+
+  public static getMonthlyWorkingDaysConfig(monthYear: string): MonthlyWorkingDaysConfig {
+    if (!this.state.monthlyWorkingDays) this.state.monthlyWorkingDays = [];
+    const found = this.state.monthlyWorkingDays.find(m => m.month === monthYear);
+    if (found) return found;
+
+    const [yearStr, monthStr] = monthYear.split('-');
+    const year = parseInt(yearStr, 10) || new Date().getFullYear();
+    const monthNumber = parseInt(monthStr, 10) || (new Date().getMonth() + 1);
+
+    const calc = this.calculateWorkingDaysForMonth(year, monthNumber);
+    const config: MonthlyWorkingDaysConfig = {
+      id: `mwd-${year}-${monthStr}`,
+      year,
+      month: monthYear,
+      ...calc,
+      manualOverride: false,
+      manualWorkingDays: calc.autoWorkingDays,
+      finalWorkingDays: calc.autoWorkingDays,
+      updatedBy: 'System',
+      updatedAt: new Date().toISOString()
+    };
+    this.state.monthlyWorkingDays.push(config);
+    return config;
+  }
+
+  public static async saveMonthlyWorkingDaysConfig(config: MonthlyWorkingDaysConfig, userRole: string = 'Admin'): Promise<MonthlyWorkingDaysConfig> {
+    if (!this.state.monthlyWorkingDays) this.state.monthlyWorkingDays = [];
+    const idx = this.state.monthlyWorkingDays.findIndex(m => m.month === config.month);
+
+    if (config.manualWorkingDays < 0 || config.manualWorkingDays > config.calendarDays) {
+      throw new Error(`Manual Working Days cannot be less than 0 or greater than total calendar days (${config.calendarDays}).`);
+    }
+
+    const finalDays = config.manualOverride ? config.manualWorkingDays : config.autoWorkingDays;
+    const updated: MonthlyWorkingDaysConfig = {
+      ...config,
+      finalWorkingDays: finalDays,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (idx !== -1) {
+      this.state.monthlyWorkingDays[idx] = updated;
+    } else {
+      this.state.monthlyWorkingDays.push(updated);
+    }
+
+    this.logAudit('UPDATE_WORKING_DAYS', `Updated working days for ${config.month}: Final = ${finalDays} (Manual Override: ${config.manualOverride})`, userRole);
+    await this.saveToStorage(this.state);
+    return updated;
   }
 
   public static resetToCleanDatabase(userRole: string = 'Admin'): void {

@@ -13,6 +13,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { AuditLog, Language } from '../../types';
+import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
 import { DatabaseService } from '../../services/db';
 
@@ -20,12 +21,14 @@ interface BackupRestoreViewProps {
   language: Language;
   auditLogs: AuditLog[];
   onRefreshAllData: () => void;
+  onBack?: () => void;
 }
 
 export const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
   language,
   auditLogs,
-  onRefreshAllData
+  onRefreshAllData,
+  onBack
 }) => {
   const t = translations[language];
 
@@ -103,6 +106,10 @@ export const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
 
   return (
     <div className="flex-1 p-6 overflow-y-auto bg-[#f0f2f5] text-[#111827] space-y-6 font-sans">
+      <div className="flex items-center gap-2">
+        {onBack && <BackButton onClick={onBack} />}
+      </div>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>

@@ -17,6 +17,7 @@ import { SettingsView } from './components/settings/SettingsView';
 import { BackupRestoreView } from './components/backup/BackupRestoreView';
 
 import { DatabaseService } from './services/db';
+import { AttendanceProcessor } from './services/attendanceProcessor';
 import {
   Language,
   UserRole,
@@ -40,7 +41,57 @@ export default function App() {
   const [currentLanguage, setCurrentLanguage] = useState<Language>('en');
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>('Admin');
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [navHistory, setNavHistory] = useState<ActiveTab[]>(['dashboard']);
   const [currentMonth, setCurrentMonth] = useState<string>('2026-01');
+
+  const navigateTo = useCallback((tab: ActiveTab) => {
+    if (tab === activeTab) return;
+    if (tab === 'dashboard') {
+      setNavHistory(['dashboard']);
+      setActiveTab('dashboard');
+    } else {
+      setNavHistory(prev => [...prev.filter(t => t !== tab), activeTab]);
+      setActiveTab(tab);
+    }
+  }, [activeTab]);
+
+  const goBack = useCallback(() => {
+    if (navHistory.length > 1) {
+      const newHistory = [...navHistory];
+      const previousTab = newHistory.pop()!;
+      setNavHistory(newHistory);
+      setActiveTab(previousTab);
+    } else {
+      setActiveTab('dashboard');
+      setNavHistory(['dashboard']);
+    }
+  }, [navHistory]);
+
+  // Global ESC handler preventing app exit and handling back / modal close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Check if any modal is open
+        const openModal = document.querySelector('[role="dialog"], .fixed.inset-0.z-50, .modal-backdrop');
+        if (openModal) {
+          const closeEvent = new CustomEvent('app-close-modal');
+          window.dispatchEvent(closeEvent);
+          return;
+        }
+
+        // If not on dashboard, go back
+        if (activeTab !== 'dashboard') {
+          goBack();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [activeTab, goBack]);
 
   // Database States
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -120,7 +171,27 @@ export default function App() {
   // Handler: Punches Downloaded from Biometric Device
   const handlePunchesDownloaded = (punches: RawAttendancePunch[]) => {
     DatabaseService.saveRawPunches(punches, currentUserRole);
-    setRawPunches(DatabaseService.getRawPunches());
+    const updatedRawPunches = DatabaseService.getRawPunches();
+    setRawPunches(updatedRawPunches);
+
+    // Auto-process attendance for all distinct months present in downloaded punches
+    const affectedMonths = Array.from(new Set(punches.map(p => p.punchDate ? p.punchDate.substring(0, 7) : ''))).filter(Boolean);
+    if (affectedMonths.length > 0) {
+      let currentAtt = DatabaseService.getProcessedAttendance();
+      affectedMonths.forEach(m => {
+        const result = AttendanceProcessor.processMonthAttendance(
+          m,
+          employees,
+          updatedRawPunches,
+          leaves,
+          currentAtt,
+          settings
+        );
+        DatabaseService.saveProcessedAttendanceBatch(result.records, currentUserRole);
+        currentAtt = DatabaseService.getProcessedAttendance();
+      });
+      setAttendance(currentAtt);
+    }
   };
 
   // Handler: Save Processed Attendance Batch
@@ -135,10 +206,16 @@ export default function App() {
     setAttendance(DatabaseService.getProcessedAttendance());
   };
 
-  // Handler: Apply Leave
-  const handleApplyLeave = (leave: Omit<EmployeeLeave, 'id'>) => {
-    DatabaseService.saveLeave(leave, currentUserRole);
-    setLeaves(DatabaseService.getLeaves());
+  // Handler: Save Leave
+  const handleSaveLeave = async (leave: Omit<EmployeeLeave, 'id'> | EmployeeLeave) => {
+    await DatabaseService.saveLeave(leave, currentUserRole);
+    setLeaves([...DatabaseService.getLeaves()]);
+  };
+
+  // Handler: Delete Leave
+  const handleDeleteLeave = async (id: string) => {
+    await DatabaseService.deleteLeave(id, currentUserRole);
+    setLeaves([...DatabaseService.getLeaves()]);
   };
 
   // Handler: Update Leave Status
@@ -233,7 +310,7 @@ export default function App() {
       {/* Sidebar Navigation */}
       <SidebarNav
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={navigateTo}
         language={currentLanguage}
       />
 
@@ -242,14 +319,14 @@ export default function App() {
         {activeTab === 'dashboard' && (
           <DashboardView
             language={currentLanguage}
-            onNavigate={setActiveTab}
+            onNavigate={navigateTo}
             employees={employees}
             attendance={attendance}
             currentMonth={currentMonth}
             payrollPeriod={payrollPeriod}
             devices={devices}
-            onTriggerDownloadPunches={() => setActiveTab('devices')}
-            onTriggerGeneratePayroll={() => setActiveTab('payroll')}
+            onTriggerDownloadPunches={() => navigateTo('devices')}
+            onTriggerGeneratePayroll={() => navigateTo('payroll')}
           />
         )}
 
@@ -262,6 +339,7 @@ export default function App() {
             payrollCategories={payrollCategories}
             onSaveEmployee={handleSaveEmployee}
             onDeleteEmployee={handleDeleteEmployee}
+            onBack={goBack}
           />
         )}
 
@@ -277,6 +355,7 @@ export default function App() {
             settings={settings}
             onSaveAttendanceBatch={handleSaveAttendanceBatch}
             onUpdateSingleAttendance={handleUpdateSingleAttendance}
+            onBack={goBack}
           />
         )}
 
@@ -289,6 +368,7 @@ export default function App() {
             onSaveDevice={handleSaveDevice}
             onPunchesDownloaded={handlePunchesDownloaded}
             onUpdateEmployee={handleSaveEmployee}
+            onBack={goBack}
           />
         )}
 
@@ -298,8 +378,11 @@ export default function App() {
             employees={employees}
             leaves={leaves}
             leaveTypes={leaveTypes}
-            onApplyLeave={handleApplyLeave}
+            payrollPeriods={DatabaseService.getState().payrollPeriods || []}
+            onSaveLeave={handleSaveLeave}
+            onDeleteLeave={handleDeleteLeave}
             onUpdateLeaveStatus={handleUpdateLeaveStatus}
+            onBack={goBack}
           />
         )}
 
@@ -312,6 +395,7 @@ export default function App() {
             incentives={incentives}
             onSaveIncentive={handleSaveIncentive}
             onDeleteIncentive={handleDeleteIncentive}
+            onBack={goBack}
           />
         )}
 
@@ -331,7 +415,8 @@ export default function App() {
             incentives={incentives}
             payrollCategories={payrollCategories}
             onSavePayrollPeriod={handleSavePayrollPeriod}
-            onNavigate={setActiveTab}
+            onNavigate={navigateTo}
+            onBack={goBack}
           />
         )}
 
@@ -341,6 +426,7 @@ export default function App() {
             currentMonth={currentMonth}
             payrollPeriod={payrollPeriod}
             settings={settings}
+            onBack={goBack}
           />
         )}
 
@@ -351,6 +437,7 @@ export default function App() {
             payrollPeriod={payrollPeriod}
             settings={settings}
             employees={employees}
+            onBack={goBack}
           />
         )}
 
@@ -363,6 +450,7 @@ export default function App() {
             settings={settings}
             employees={employees}
             onSavePayrollPeriod={handleSavePayrollPeriod}
+            onBack={goBack}
           />
         )}
 
@@ -371,6 +459,7 @@ export default function App() {
             language={currentLanguage}
             rules={allowanceRules}
             onSaveRule={handleSaveAllowanceRule}
+            onBack={goBack}
           />
         )}
 
@@ -383,6 +472,7 @@ export default function App() {
             payrollPeriod={payrollPeriod}
             departments={departments}
             settings={settings}
+            onBack={goBack}
           />
         )}
 
@@ -410,6 +500,7 @@ export default function App() {
             onSaveDevice={handleSaveDevice}
             onPunchesDownloaded={handlePunchesDownloaded}
             onUpdateEmployee={handleSaveEmployee}
+            onBack={goBack}
           />
         )}
 
@@ -418,6 +509,7 @@ export default function App() {
             language={currentLanguage}
             auditLogs={auditLogs}
             onRefreshAllData={loadAllData}
+            onBack={goBack}
           />
         )}
       </main>

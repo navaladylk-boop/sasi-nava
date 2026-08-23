@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   UserCheck,
   Radio,
-  Briefcase
+  Briefcase,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import {
   CompanySettings,
@@ -25,8 +26,10 @@ import {
   AllowanceDeductionRule
 } from '../../types';
 import { translations } from '../../i18n/translations';
+import { BackButton } from '../common/NavigationButtons';
 import { AttendanceDeviceSettings } from './AttendanceDeviceSettings';
 import { OrgStructureSettings } from './OrgStructureSettings';
+import { HolidayCalendarView } from './HolidayCalendarView';
 
 interface SettingsViewProps {
   language: Language;
@@ -51,6 +54,7 @@ interface SettingsViewProps {
   onSaveDevice?: (device: Partial<FingerprintDevice>) => void;
   onPunchesDownloaded?: (punches: RawAttendancePunch[]) => void;
   onUpdateEmployee?: (emp: Partial<Employee>) => void;
+  onBack?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -75,11 +79,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onDeletePayrollCategory = (_id: string) => ({ success: true }),
   onSaveDevice = () => {},
   onPunchesDownloaded = () => {},
-  onUpdateEmployee = () => {}
+  onUpdateEmployee = () => {},
+  onBack
 }) => {
   const t = translations[language];
 
-  const [activeSubTab, setActiveSubTab] = useState<'general' | 'org' | 'device'>('general');
+  const [activeSubTab, setActiveSubTab] = useState<'general' | 'org' | 'device' | 'holiday'>('general');
   const [formSettings, setFormSettings] = useState<CompanySettings>({ ...settings });
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
@@ -90,8 +95,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
+  if (activeSubTab === 'holiday') {
+    return (
+      <HolidayCalendarView
+        language={language}
+        currentUserRole={currentUserRole}
+        onBack={() => setActiveSubTab('general')}
+      />
+    );
+  }
+
   return (
     <div className="flex-1 p-6 overflow-y-auto bg-[#f0f2f5] text-[#111827] space-y-6 font-sans">
+      <div className="flex items-center gap-2">
+        {onBack && <BackButton onClick={onBack} />}
+      </div>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -151,6 +170,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         >
           <Radio className="w-4 h-4" />
           Attendance Device (Hikvision DS-K1A8503MF)
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('holiday')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+            activeSubTab === 'holiday'
+              ? 'border-[#005a9e] text-[#005a9e] bg-white rounded-t-lg shadow-2xs'
+              : 'border-transparent text-[#6b7280] hover:text-[#111827]'
+          }`}
+        >
+          <CalendarIcon className="w-4 h-4" />
+          Holiday Calendar & Working Days
         </button>
       </div>
 

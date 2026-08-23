@@ -308,15 +308,21 @@ export class HikvisionISAPIClient {
     endDate?: string,
     onProgress?: (progressInfo: { totalFetched: number; currentBatchSize: number }) => void
   ): Promise<HikvisionEventLog[]> {
+    const queryStartTime = new Date().toISOString();
+
     // Format start/end date in Sri Lanka (+05:30) timezone
     const formatTimeForHikvision = (dateStr?: string, isEnd = false): string => {
       if (!dateStr || dateStr.trim() === '') {
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const dStr = `${yyyy}-${mm}-${dd}`;
-        return isEnd ? `${dStr}T23:59:59+05:30` : `${dStr}T00:00:00+05:30`;
+        if (isEnd) {
+          const now = new Date();
+          const yyyy = now.getFullYear();
+          const mm = String(now.getMonth() + 1).padStart(2, '0');
+          const dd = String(now.getDate()).padStart(2, '0');
+          return `${yyyy}-${mm}-${dd}T23:59:59+05:30`;
+        } else {
+          // Wide historical default starting from 2000 to catch all prior device events
+          return `2000-01-01T00:00:00+05:30`;
+        }
       }
       if (dateStr.includes('T')) {
         return dateStr;
@@ -332,12 +338,21 @@ export class HikvisionISAPIClient {
     const allEvents: HikvisionEventLog[] = [];
     const eventSerialSet = new Set<string>();
 
+    console.log(`\n=================== HIKVISION DIAGNOSTIC QUERY START ===================`);
+    console.log(`[Hikvision Diagnostic] Query Start Time: ${queryStartTime}`);
+    console.log(`[Hikvision Diagnostic] Date Filter Range: ${startStr} ---> ${endStr}`);
+    console.log(`[Hikvision Diagnostic] Search ID: ${searchID}, Max Batch Size: ${maxResults}`);
+
     // 1. Try JSON Paginated Query
     let position = 0;
     let hasMore = true;
     let jsonSuccess = false;
+    let batchIndex = 0;
 
     while (hasMore) {
+      batchIndex++;
+      console.log(`[Hikvision Diagnostic] Batch #${batchIndex}: Requesting searchResultPosition=${position}, maxResults=${maxResults}`);
+
       const jsonPayload = JSON.stringify({
         AcsEventCond: {
           searchID,
@@ -359,13 +374,17 @@ export class HikvisionISAPIClient {
           const matches = acsEvent.InfoList || json.InfoList || [];
           const totalMatches = acsEvent.totalMatches || acsEvent.responseStatusNumOfMatches || matches.length;
 
+          console.log(`[Hikvision Diagnostic] Batch #${batchIndex} Response: ${matches.length} items returned (totalMatches indicated by device: ${totalMatches})`);
+
           if (!Array.isArray(matches) || matches.length === 0) {
+            console.log(`[Hikvision Diagnostic] Batch #${batchIndex}: Empty response block received. Ending pagination.`);
             hasMore = false;
             break;
           }
 
+          let batchFilteredOut = 0;
           matches.forEach((item: any) => {
-            const empNo = item.employeeNoString || item.employeeNo || item.cardNo;
+            const empNo = item.employeeNoString || (item.employeeNo !== undefined && item.employeeNo !== null ? String(item.employeeNo) : undefined) || item.cardNo;
             if (empNo) {
               let verifyMode: 'FINGERPRINT' | 'FACE' | 'CARD' | 'PASSWORD' = 'FINGERPRINT';
               if (item.currentVerifyMode === 'face' || item.minor === 76) verifyMode = 'FACE';
@@ -391,9 +410,18 @@ export class HikvisionISAPIClient {
                   verifyMode,
                   direction
                 });
+              } else {
+                batchFilteredOut++;
               }
+            } else {
+              batchFilteredOut++;
+              console.log(`[Hikvision Diagnostic] Filtered out event record without employeeNo or cardNo. Timestamp: ${item.time}`);
             }
           });
+
+          if (batchFilteredOut > 0) {
+            console.log(`[Hikvision Diagnostic] Batch #${batchIndex}: ${batchFilteredOut} records filtered out as internal ISAPI batch duplicates or missing user ID.`);
+          }
 
           if (onProgress) {
             onProgress({ totalFetched: allEvents.length, currentBatchSize: matches.length });
@@ -407,7 +435,8 @@ export class HikvisionISAPIClient {
         } else {
           hasMore = false;
         }
-      } catch (err) {
+      } catch (err: any) {
+        console.error(`[Hikvision Diagnostic] JSON Query Error at position ${position}: ${err?.message}`);
         if (!jsonSuccess) {
           break;
         }
@@ -416,14 +445,29 @@ export class HikvisionISAPIClient {
     }
 
     if (jsonSuccess && allEvents.length > 0) {
+      const queryEndTime = new Date().toISOString();
+      const uniqueUserIds = Array.from(new Set(allEvents.map(e => e.employeeNo)));
+      const sampleTimes = allEvents.slice(0, 5).map(e => `${e.employeeNo}@${e.time}`);
+
+      console.log(`[Hikvision Diagnostic] Query End Time: ${queryEndTime}`);
+      console.log(`[Hikvision Diagnostic] Total Unique Events Fetched: ${allEvents.length}`);
+      console.log(`[Hikvision Diagnostic] Unique Employee/User IDs Found (${uniqueUserIds.length}): ${uniqueUserIds.join(', ')}`);
+      console.log(`[Hikvision Diagnostic] Sample Event Timestamps: ${sampleTimes.join(' | ')}`);
+      console.log(`=================== HIKVISION DIAGNOSTIC QUERY END ===================\n`);
+
       return allEvents;
     }
 
     // 2. XML Fallback Paginated Query
+    console.log(`[Hikvision Diagnostic] Attempting XML ISAPI AcsEvent Fallback Query...`);
     position = 0;
     hasMore = true;
+    batchIndex = 0;
 
     while (hasMore) {
+      batchIndex++;
+      console.log(`[Hikvision Diagnostic] XML Batch #${batchIndex}: searchResultPosition=${position}, maxResults=${maxResults}`);
+
       const xmlPayload = `<?xml version="1.0" encoding="utf-8"?>
 <AcsEventCond xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0">
   <searchID>${searchID}</searchID>
@@ -440,6 +484,8 @@ export class HikvisionISAPIClient {
         const xml = resXml.data;
 
         const eventBlocks = xml.match(/<AcsEvent>[\s\S]*?<\/AcsEvent>/gi) || [];
+        console.log(`[Hikvision Diagnostic] XML Batch #${batchIndex}: ${eventBlocks.length} AcsEvent blocks parsed.`);
+
         if (eventBlocks.length === 0) {
           hasMore = false;
           break;
@@ -450,6 +496,7 @@ export class HikvisionISAPIClient {
           return match ? match[1].trim() : '';
         };
 
+        let batchFilteredOut = 0;
         eventBlocks.forEach(block => {
           const empNo = getTag(block, 'employeeNoString') || getTag(block, 'cardNo') || getTag(block, 'employeeNo');
           const time = getTag(block, 'time');
@@ -475,7 +522,11 @@ export class HikvisionISAPIClient {
                 verifyMode,
                 direction: 'AUTO'
               });
+            } else {
+              batchFilteredOut++;
             }
+          } else {
+            batchFilteredOut++;
           }
         });
 
@@ -488,10 +539,18 @@ export class HikvisionISAPIClient {
         } else {
           position += eventBlocks.length;
         }
-      } catch {
+      } catch (err: any) {
+        console.error(`[Hikvision Diagnostic] XML Query Error at position ${position}: ${err?.message}`);
         hasMore = false;
       }
     }
+
+    const queryEndTime = new Date().toISOString();
+    const uniqueUserIds = Array.from(new Set(allEvents.map(e => e.employeeNo)));
+    console.log(`[Hikvision Diagnostic] XML Query End Time: ${queryEndTime}`);
+    console.log(`[Hikvision Diagnostic] Total Unique Events Fetched via XML: ${allEvents.length}`);
+    console.log(`[Hikvision Diagnostic] Employee/User IDs Found (${uniqueUserIds.length}): ${uniqueUserIds.join(', ')}`);
+    console.log(`=================== HIKVISION DIAGNOSTIC QUERY END ===================\n`);
 
     return allEvents;
   }

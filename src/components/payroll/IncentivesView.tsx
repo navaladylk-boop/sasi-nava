@@ -14,6 +14,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Employee, IncentiveRecord, IncentiveType, Language } from '../../types';
+import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
 
 interface IncentivesViewProps {
@@ -24,6 +25,7 @@ interface IncentivesViewProps {
   incentives: IncentiveRecord[];
   onSaveIncentive: (incentive: Partial<IncentiveRecord>) => void;
   onDeleteIncentive: (id: string) => void;
+  onBack?: () => void;
 }
 
 export const IncentivesView: React.FC<IncentivesViewProps> = ({
@@ -33,7 +35,8 @@ export const IncentivesView: React.FC<IncentivesViewProps> = ({
   employees,
   incentives,
   onSaveIncentive,
-  onDeleteIncentive
+  onDeleteIncentive,
+  onBack
 }) => {
   const t = translations[language];
 
@@ -121,6 +124,9 @@ export const IncentivesView: React.FC<IncentivesViewProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
+          <div className="flex items-center gap-2 mb-1">
+            {onBack && <BackButton onClick={onBack} />}
+          </div>
           <h1 className="text-xl font-bold text-[#111827] flex items-center gap-2">
             <Award className="w-5 h-5 text-[#005a9e]" />
             Incentives & Performance Rewards
