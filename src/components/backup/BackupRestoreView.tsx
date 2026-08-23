@@ -12,7 +12,7 @@ import {
   Sparkles,
   AlertTriangle
 } from 'lucide-react';
-import { AuditLog, Language } from '../../types';
+import { AuditLog, Language, UserRole } from '../../types';
 import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
 import { DatabaseService } from '../../services/db';
@@ -20,6 +20,7 @@ import { DatabaseService } from '../../services/db';
 interface BackupRestoreViewProps {
   language: Language;
   auditLogs: AuditLog[];
+  currentUserRole: UserRole;
   onRefreshAllData: () => void;
   onBack?: () => void;
 }
@@ -27,6 +28,7 @@ interface BackupRestoreViewProps {
 export const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
   language,
   auditLogs,
+  currentUserRole,
   onRefreshAllData,
   onBack
 }) => {
@@ -93,15 +95,30 @@ export const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
   };
 
   const handleClearAllData = () => {
-    if (
-      confirm(
-        'Are you sure you want to clear all data and reset to a fresh, clean database? All registered employees, attendance logs, and payroll calculations will be permanently purged.'
-      )
-    ) {
-      DatabaseService.resetToCleanDatabase();
-      onRefreshAllData();
-      alert('All records cleared. Fresh database initialized!');
+    if (currentUserRole !== 'Admin') {
+      alert('Error: Admin authorization is required to clear the production database.');
+      return;
     }
+
+    const confirmBackup = confirm(
+      'RECOMMENDATION: It is highly recommended to download a backup before performing a full database wipe.\n\nAre you sure you have backed up your database and wish to proceed with a complete system reset?'
+    );
+    if (!confirmBackup) return;
+
+    const strongConfirm = confirm(
+      'WARNING: This action is completely irreversible. All employee profiles, biometric logs, and historical payroll periods will be deleted permanently.'
+    );
+    if (!strongConfirm) return;
+
+    const inputPhrase = prompt('To confirm this action, please type exactly:\nDELETE ALL DATA');
+    if (inputPhrase !== 'DELETE ALL DATA') {
+      alert('Database wipe aborted. The confirmation text did not match.');
+      return;
+    }
+
+    DatabaseService.resetToCleanDatabase();
+    onRefreshAllData();
+    alert('All records cleared. Fresh database initialized!');
   };
 
   return (

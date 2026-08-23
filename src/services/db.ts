@@ -231,6 +231,57 @@ export class DatabaseService {
   private static state: DatabaseState = DatabaseService.loadFromStorage();
   private static isInitialized = false;
 
+  private static deletedIds: {
+    employees: string[];
+    employeeLeaves: string[];
+    holidays: string[];
+    departments: string[];
+    designations: string[];
+    devices: string[];
+    rawPunches: string[];
+    processedAttendance: string[];
+    incentives: string[];
+    payrollCategories: string[];
+    payrollPeriods: string[];
+    allowanceRules: string[];
+    leaveTypes: string[];
+    monthlyWorkingDays: string[];
+  } = {
+    employees: [],
+    employeeLeaves: [],
+    holidays: [],
+    departments: [],
+    designations: [],
+    devices: [],
+    rawPunches: [],
+    processedAttendance: [],
+    incentives: [],
+    payrollCategories: [],
+    payrollPeriods: [],
+    allowanceRules: [],
+    leaveTypes: [],
+    monthlyWorkingDays: []
+  };
+
+  private static clearDeletedIds(): void {
+    this.deletedIds = {
+      employees: [],
+      employeeLeaves: [],
+      holidays: [],
+      departments: [],
+      designations: [],
+      devices: [],
+      rawPunches: [],
+      processedAttendance: [],
+      incentives: [],
+      payrollCategories: [],
+      payrollPeriods: [],
+      allowanceRules: [],
+      leaveTypes: [],
+      monthlyWorkingDays: []
+    };
+  }
+
   public static async initialize(): Promise<DatabaseState> {
     if (this.isInitialized) return this.state;
 
@@ -318,13 +369,21 @@ export class DatabaseService {
 
       // Sync directly to SQLite database via Electron IPC
       if (typeof window !== 'undefined' && window.electronAPI?.dbSaveAll) {
-        const res = await window.electronAPI.dbSaveAll(state);
+        const payload = {
+          ...state,
+          deletedIds: { ...this.deletedIds }
+        };
+        const res = await window.electronAPI.dbSaveAll(payload);
         if (!res.success) {
           console.error('[DatabaseService] Electron SQLite write error:', res.error);
           return { success: false, error: res.error || 'Failed to write SQLite database to disk.' };
         }
+        // Successfully saved - clear the accumulated deletedIds
+        this.clearDeletedIds();
         return { success: true };
       }
+      // If not Electron, also clear them so they don't accumulate indefinitely in RAM
+      this.clearDeletedIds();
       return { success: true };
     } catch (err: any) {
       console.error('[DatabaseService] Failed to persist database:', err);
@@ -491,6 +550,7 @@ export class DatabaseService {
     const emp = this.getEmployeeById(id);
     const previousEmployees = [...this.state.employees];
     this.state.employees = this.state.employees.filter(e => e.id !== id);
+    this.deletedIds.employees.push(id);
     this.logAudit('DELETE_EMPLOYEE', `Deleted employee ${emp?.employeeCode || id}`, userRole);
 
     const saveResult = await this.saveToStorage(this.state);
@@ -535,6 +595,7 @@ export class DatabaseService {
       return { success: false, message: 'Cannot delete department: Employees are currently assigned to it.' };
     }
     this.state.departments = this.state.departments.filter(d => d.id !== id);
+    this.deletedIds.departments.push(id);
     this.logAudit('DELETE_DEPARTMENT', `Deleted department ${id}`, userRole);
     this.saveToStorage(this.state);
     return { success: true };
@@ -572,6 +633,7 @@ export class DatabaseService {
       return { success: false, message: 'Cannot delete designation: Employees are currently assigned to it.' };
     }
     this.state.designations = this.state.designations.filter(d => d.id !== id);
+    this.deletedIds.designations.push(id);
     this.logAudit('DELETE_DESIGNATION', `Deleted designation ${id}`, userRole);
     this.saveToStorage(this.state);
     return { success: true };
@@ -615,6 +677,7 @@ export class DatabaseService {
 
   public static deleteDevice(id: string, userRole: string = 'Admin'): void {
     this.state.devices = (this.state.devices || []).filter(d => d.id !== id);
+    this.deletedIds.devices.push(id);
     this.logAudit('DELETE_DEVICE', `Removed device ${id}`, userRole);
     this.saveToStorage(this.state);
   }
@@ -751,6 +814,7 @@ export class DatabaseService {
 
   public static deleteAttendanceRecord(id: string, userRole: string = 'Admin'): void {
     this.state.processedAttendance = (this.state.processedAttendance || []).filter(a => a.id !== id);
+    this.deletedIds.processedAttendance.push(id);
     this.logAudit('DELETE_ATTENDANCE', `Deleted attendance entry ${id}`, userRole);
     this.saveToStorage(this.state);
   }
@@ -818,6 +882,7 @@ export class DatabaseService {
     const leaveRecord = (this.state.employeeLeaves || []).find(l => l.id === id);
     const previousLeaves = [...(this.state.employeeLeaves || [])];
     this.state.employeeLeaves = (this.state.employeeLeaves || []).filter(l => l.id !== id);
+    this.deletedIds.employeeLeaves.push(id);
     this.logAudit('DELETE_LEAVE', `Deleted leave application ${id} (Emp: ${leaveRecord?.employeeId}, Dates: ${leaveRecord?.startDate} to ${leaveRecord?.endDate})`, userRole);
 
     const saveResult = await this.saveToStorage(this.state);
@@ -871,6 +936,7 @@ export class DatabaseService {
 
   public static deleteIncentive(id: string, userRole: string = 'Admin'): void {
     this.state.incentives = (this.state.incentives || []).filter(i => i.id !== id);
+    this.deletedIds.incentives.push(id);
     this.logAudit('DELETE_INCENTIVE', `Removed incentive ${id}`, userRole);
     this.saveToStorage(this.state);
   }
@@ -951,6 +1017,7 @@ export class DatabaseService {
       return { success: false, message: 'Cannot delete the only remaining payroll category.' };
     }
     this.state.payrollCategories = this.state.payrollCategories.filter(c => c.id !== id);
+    this.deletedIds.payrollCategories.push(id);
     this.logAudit('DELETE_PAYROLL_CATEGORY', `Deleted payroll category ${id}`, userRole);
     this.saveToStorage(this.state);
     return { success: true };
@@ -1062,6 +1129,7 @@ export class DatabaseService {
   public static async deleteHoliday(id: string, userRole: string = 'Admin'): Promise<void> {
     const h = (this.state.holidays || []).find(x => x.id === id);
     this.state.holidays = (this.state.holidays || []).filter(x => x.id !== id);
+    this.deletedIds.holidays.push(id);
     this.logAudit('DELETE_HOLIDAY', `Deleted holiday ${h?.name || id} on ${h?.date}`, userRole);
     await this.saveToStorage(this.state);
   }

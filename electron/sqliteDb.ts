@@ -297,69 +297,219 @@ export class SqliteDatabaseManager {
 
       // Company Settings
       if (state.companySettings) {
-        this.db.run('DELETE FROM company_settings');
-        this.db.run('INSERT INTO company_settings (id, data, updated_at) VALUES (?, ?, ?)', [
+        this.db.run('INSERT OR REPLACE INTO company_settings (id, data, updated_at) VALUES (?, ?, ?)', [
           state.companySettings.id || 'company-01',
           JSON.stringify(state.companySettings),
           new Date().toISOString()
         ]);
       }
 
-      // Helper to replace table contents
-      const replaceTable = (tableName: string, items: any[], getId: (item: any) => string) => {
-        this.db!.run(`DELETE FROM ${tableName}`);
+      // Helper to perform ID-based UPSERT / INSERT OR REPLACE
+      const upsertRecord = (tableName: string, item: any, id: string) => {
+        if (tableName === 'holidays') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO holidays (id, holiday_date, holiday_name, holiday_type, year, created_at, updated_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              id,
+              item.date || '',
+              item.name || '',
+              item.type || 'Poya',
+              item.year || 0,
+              item.createdAt || new Date().toISOString(),
+              new Date().toISOString(),
+              JSON.stringify(item)
+            ]
+          );
+        } else if (tableName === 'monthly_working_days') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO monthly_working_days (id, year, month, auto_working_days, manual_override, manual_working_days, final_working_days, updated_by, updated_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              id,
+              item.year || 0,
+              item.month || '',
+              item.autoWorkingDays || 0,
+              item.manualOverride ? 1 : 0,
+              item.manualWorkingDays || 0,
+              item.finalWorkingDays || 0,
+              item.updatedBy || '',
+              item.updatedAt || new Date().toISOString(),
+              JSON.stringify(item)
+            ]
+          );
+        } else if (tableName === 'departments') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO departments (id, code, data, updated_at) VALUES (?, ?, ?, ?)`,
+            [
+              id,
+              item.code || '',
+              JSON.stringify(item),
+              new Date().toISOString()
+            ]
+          );
+        } else if (tableName === 'designations') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO designations (id, code, data, updated_at) VALUES (?, ?, ?, ?)`,
+            [
+              id,
+              item.code || '',
+              JSON.stringify(item),
+              new Date().toISOString()
+            ]
+          );
+        } else if (tableName === 'leave_types') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO leave_types (id, code, data, updated_at) VALUES (?, ?, ?, ?)`,
+            [
+              id,
+              item.code || '',
+              JSON.stringify(item),
+              new Date().toISOString()
+            ]
+          );
+        } else if (tableName === 'employees') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO employees (id, employee_code, data, updated_at) VALUES (?, ?, ?, ?)`,
+            [
+              id,
+              item.employeeCode || '',
+              JSON.stringify(item),
+              new Date().toISOString()
+            ]
+          );
+        } else if (tableName === 'devices') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO devices (id, ip_address, data, updated_at) VALUES (?, ?, ?, ?)`,
+            [
+              id,
+              item.ipAddress || '',
+              JSON.stringify(item),
+              new Date().toISOString()
+            ]
+          );
+        } else if (tableName === 'raw_punches') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO raw_punches (id, device_id, user_id, punch_timestamp, data, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              id,
+              item.deviceId || '',
+              item.userId || '',
+              item.timestamp || '',
+              JSON.stringify(item),
+              new Date().toISOString()
+            ]
+          );
+        } else if (tableName === 'processed_attendance') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO processed_attendance (id, employee_id, date, data, updated_at) VALUES (?, ?, ?, ?, ?)`,
+            [
+              id,
+              item.employeeId || '',
+              item.date || '',
+              JSON.stringify(item),
+              new Date().toISOString()
+            ]
+          );
+        } else if (tableName === 'employee_leaves') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO employee_leaves (id, employee_id, start_date, end_date, data, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+            [
+              id,
+              item.employeeId || '',
+              item.startDate || '',
+              item.endDate || '',
+              JSON.stringify(item),
+              new Date().toISOString()
+            ]
+          );
+        } else if (tableName === 'incentives') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO incentives (id, employee_id, month_year, data, updated_at) VALUES (?, ?, ?, ?, ?)`,
+            [
+              id,
+              item.employeeId || '',
+              item.payrollMonth || '',
+              JSON.stringify(item),
+              new Date().toISOString()
+            ]
+          );
+        } else if (tableName === 'payroll_periods') {
+          this.db!.run(
+            `INSERT OR REPLACE INTO payroll_periods (id, month_year, data, updated_at) VALUES (?, ?, ?, ?)`,
+            [
+              id,
+              item.monthYear || item.month || '',
+              JSON.stringify(item),
+              new Date().toISOString()
+            ]
+          );
+        } else {
+          this.db!.run(
+            `INSERT OR REPLACE INTO ${tableName} (id, data, updated_at) VALUES (?, ?, ?)`,
+            [
+              id,
+              JSON.stringify(item),
+              new Date().toISOString()
+            ]
+          );
+        }
+      };
+
+      const upsertTable = (tableName: string, items: any[], getId: (item: any) => string) => {
         if (Array.isArray(items) && items.length > 0) {
           items.forEach(item => {
             const id = getId(item) || `${tableName}-${Date.now()}-${Math.random()}`;
-            if (tableName === 'holidays') {
-              this.db!.run(`INSERT INTO holidays (id, holiday_date, holiday_name, holiday_type, year, created_at, updated_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
-                id,
-                item.date || '',
-                item.name || '',
-                item.type || 'Poya',
-                item.year || 0,
-                new Date().toISOString(),
-                new Date().toISOString(),
-                JSON.stringify(item)
-              ]);
-            } else if (tableName === 'monthly_working_days') {
-              this.db!.run(`INSERT INTO monthly_working_days (id, year, month, auto_working_days, manual_override, manual_working_days, final_working_days, updated_by, updated_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
-                id,
-                item.year || 0,
-                item.month || '',
-                item.autoWorkingDays || 0,
-                item.manualOverride ? 1 : 0,
-                item.manualWorkingDays || 0,
-                item.finalWorkingDays || 0,
-                item.updatedBy || '',
-                item.updatedAt || new Date().toISOString(),
-                JSON.stringify(item)
-              ]);
-            } else {
-              this.db!.run(`INSERT INTO ${tableName} (id, data, updated_at) VALUES (?, ?, ?)`, [
-                id,
-                JSON.stringify(item),
-                new Date().toISOString()
-              ]);
-            }
+            upsertRecord(tableName, item, id);
           });
         }
       };
 
-      replaceTable('departments', state.departments, i => i.id);
-      replaceTable('designations', state.designations, i => i.id);
-      replaceTable('payroll_categories', state.payrollCategories, i => i.id);
-      replaceTable('allowance_rules', state.allowanceRules, i => i.id);
-      replaceTable('leave_types', state.leaveTypes, i => i.id);
-      replaceTable('employees', state.employees, i => i.id);
-      replaceTable('devices', state.devices, i => i.id);
-      replaceTable('raw_punches', state.rawPunches, i => i.id);
-      replaceTable('processed_attendance', state.processedAttendance, i => i.id);
-      replaceTable('employee_leaves', state.employeeLeaves, i => i.id);
-      replaceTable('incentives', state.incentives, i => i.id);
-      replaceTable('payroll_periods', state.payrollPeriods, i => i.id);
-      replaceTable('holidays', state.holidays || [], i => i.id);
-      replaceTable('monthly_working_days', state.monthlyWorkingDays || [], i => i.id);
+      upsertTable('departments', state.departments, i => i.id);
+      upsertTable('designations', state.designations, i => i.id);
+      upsertTable('payroll_categories', state.payrollCategories, i => i.id);
+      upsertTable('allowance_rules', state.allowanceRules, i => i.id);
+      upsertTable('leave_types', state.leaveTypes, i => i.id);
+      upsertTable('employees', state.employees, i => i.id);
+      upsertTable('devices', state.devices, i => i.id);
+      upsertTable('raw_punches', state.rawPunches, i => i.id);
+      upsertTable('processed_attendance', state.processedAttendance, i => i.id);
+      upsertTable('employee_leaves', state.employeeLeaves, i => i.id);
+      upsertTable('incentives', state.incentives, i => i.id);
+      upsertTable('payroll_periods', state.payrollPeriods, i => i.id);
+      upsertTable('holidays', state.holidays || [], i => i.id);
+      upsertTable('monthly_working_days', state.monthlyWorkingDays || [], i => i.id);
+
+      // Process explicit deletions if sent from frontend
+      if (state.deletedIds) {
+        const deletedMap = state.deletedIds;
+        const tablesToClean = [
+          { key: 'employees', table: 'employees' },
+          { key: 'employeeLeaves', table: 'employee_leaves' },
+          { key: 'holidays', table: 'holidays' },
+          { key: 'departments', table: 'departments' },
+          { key: 'designations', table: 'designations' },
+          { key: 'devices', table: 'devices' },
+          { key: 'rawPunches', table: 'raw_punches' },
+          { key: 'processedAttendance', table: 'processed_attendance' },
+          { key: 'incentives', table: 'incentives' },
+          { key: 'payrollCategories', table: 'payroll_categories' },
+          { key: 'payrollPeriods', table: 'payroll_periods' },
+          { key: 'allowanceRules', table: 'allowance_rules' },
+          { key: 'leaveTypes', table: 'leave_types' },
+          { key: 'monthlyWorkingDays', table: 'monthly_working_days' }
+        ];
+
+        tablesToClean.forEach(({ key, table }) => {
+          const ids: string[] = deletedMap[key];
+          if (Array.isArray(ids) && ids.length > 0) {
+            ids.forEach(id => {
+              if (id) {
+                this.db!.run(`DELETE FROM ${table} WHERE id = ?`, [id]);
+                console.log(`[SqliteDB] Explicitly deleted record with ID ${id} from table ${table}.`);
+              }
+            });
+          }
+        });
+      }
 
       // Audit logs (preserve or replace)
       if (Array.isArray(state.auditLogs)) {

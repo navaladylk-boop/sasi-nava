@@ -508,6 +508,7 @@ export default function App() {
           <BackupRestoreView
             language={currentLanguage}
             auditLogs={auditLogs}
+            currentUserRole={currentUserRole}
             onRefreshAllData={loadAllData}
             onBack={goBack}
           />
