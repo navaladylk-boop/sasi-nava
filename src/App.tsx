@@ -3,7 +3,7 @@ import { WindowFrame } from './components/layout/WindowFrame';
 import { SidebarNav, ActiveTab } from './components/layout/SidebarNav';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { EmployeeMasterView } from './components/employees/EmployeeMasterView';
-import { FingerprintDeviceView } from './components/attendance/FingerprintDeviceView';
+import { AttendanceDeviceSettings } from './components/settings/AttendanceDeviceSettings';
 import { AttendanceView } from './components/attendance/AttendanceView';
 import { LeaveManagementView } from './components/leave/LeaveManagementView';
 import { IncentivesView } from './components/payroll/IncentivesView';
@@ -280,13 +280,14 @@ export default function App() {
         )}
 
         {activeTab === 'devices' && (
-          <FingerprintDeviceView
+          <AttendanceDeviceSettings
             language={currentLanguage}
             devices={devices}
             rawPunches={rawPunches}
+            employees={employees}
             onSaveDevice={handleSaveDevice}
-            onDeleteDevice={handleDeleteDevice}
             onPunchesDownloaded={handlePunchesDownloaded}
+            onUpdateEmployee={handleSaveEmployee}
           />
         )}
 

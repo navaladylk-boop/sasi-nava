@@ -242,93 +242,146 @@ var HikvisionISAPIClient = class {
       return (/* @__PURE__ */ new Date()).toISOString().replace("T", " ").substring(0, 19);
     }
   }
-  // Download Attendance Event Records (ISAPI AcsEvent)
+  // Download Attendance Event Records (ISAPI AcsEvent with pagination)
   async getAttendanceEvents(startDate, endDate) {
     const now = /* @__PURE__ */ new Date();
     const startStr = startDate ? `${startDate}T00:00:00+05:30` : `${now.toISOString().substring(0, 10)}T00:00:00+05:30`;
     const endStr = endDate ? `${endDate}T23:59:59+05:30` : `${now.toISOString().substring(0, 10)}T23:59:59+05:30`;
-    const jsonPayload = JSON.stringify({
-      AcsEventCond: {
-        searchID: `lankahr-${Date.now()}`,
-        searchResultPosition: 0,
-        maxResults: 200,
-        major: 0,
-        minor: 0,
-        startTime: startStr,
-        endTime: endStr
-      }
-    });
-    try {
-      const res = await this.executeWithAuth("POST", "/ISAPI/AccessControl/AcsEvent?format=json", jsonPayload);
-      if (res.data.trim().startsWith("{")) {
-        const json = JSON.parse(res.data);
-        const matches = json.AcsEvent?.InfoList || json.InfoList || [];
-        const events2 = [];
-        matches.forEach((item) => {
-          const empNo = item.employeeNoString || item.employeeNo || item.cardNo;
-          if (empNo) {
-            let verifyMode = "FINGERPRINT";
-            if (item.currentVerifyMode === "face" || item.minor === 76) verifyMode = "FACE";
-            else if (item.currentVerifyMode === "card" || item.minor === 1) verifyMode = "CARD";
-            let direction = "AUTO";
-            if (item.attendanceStatus === "checkIn" || item.type === 0) direction = "IN";
-            else if (item.attendanceStatus === "checkOut" || item.type === 1) direction = "OUT";
-            events2.push({
-              serialNo: item.serialNo || `${item.time}_${empNo}`,
-              employeeNo: String(empNo).trim(),
-              time: item.time,
-              major: item.major || 5,
-              minor: item.minor || 0,
-              cardNo: item.cardNo,
-              verifyMode,
-              direction
-            });
+    const maxResults = 200;
+    const searchID = `lankahr-${Date.now()}`;
+    const allEvents = [];
+    const eventSerialSet = /* @__PURE__ */ new Set();
+    let position = 0;
+    let hasMore = true;
+    let jsonSuccess = false;
+    while (hasMore && position < 2e4) {
+      const jsonPayload = JSON.stringify({
+        AcsEventCond: {
+          searchID,
+          searchResultPosition: position,
+          maxResults,
+          major: 0,
+          minor: 0,
+          startTime: startStr,
+          endTime: endStr
+        }
+      });
+      try {
+        const res = await this.executeWithAuth("POST", "/ISAPI/AccessControl/AcsEvent?format=json", jsonPayload);
+        if (res.data.trim().startsWith("{")) {
+          jsonSuccess = true;
+          const json = JSON.parse(res.data);
+          const acsEvent = json.AcsEvent || json;
+          const matches = acsEvent.InfoList || json.InfoList || [];
+          const totalMatches = acsEvent.totalMatches || acsEvent.responseStatusNumOfMatches || matches.length;
+          if (!Array.isArray(matches) || matches.length === 0) {
+            hasMore = false;
+            break;
           }
-        });
-        return events2;
+          matches.forEach((item) => {
+            const empNo = item.employeeNoString || item.employeeNo || item.cardNo;
+            if (empNo) {
+              let verifyMode = "FINGERPRINT";
+              if (item.currentVerifyMode === "face" || item.minor === 76) verifyMode = "FACE";
+              else if (item.currentVerifyMode === "card" || item.minor === 1) verifyMode = "CARD";
+              let direction = "AUTO";
+              if (item.attendanceStatus === "checkIn" || item.type === 0) direction = "IN";
+              else if (item.attendanceStatus === "checkOut" || item.type === 1) direction = "OUT";
+              const serialNo = String(item.serialNo || `${item.time}_${empNo}`);
+              const dedupKey = `${serialNo}_${empNo}_${item.time}`;
+              if (!eventSerialSet.has(dedupKey)) {
+                eventSerialSet.add(dedupKey);
+                allEvents.push({
+                  serialNo,
+                  employeeNo: String(empNo).trim(),
+                  time: item.time,
+                  major: item.major || 5,
+                  minor: item.minor || 0,
+                  cardNo: item.cardNo,
+                  verifyMode,
+                  direction
+                });
+              }
+            }
+          });
+          if (matches.length < maxResults || totalMatches && position + matches.length >= totalMatches) {
+            hasMore = false;
+          } else {
+            position += matches.length;
+          }
+        } else {
+          hasMore = false;
+        }
+      } catch (err) {
+        if (!jsonSuccess) {
+          break;
+        }
+        hasMore = false;
       }
-    } catch {
     }
-    const xmlPayload = `<?xml version="1.0" encoding="utf-8"?>
+    if (jsonSuccess && allEvents.length > 0) {
+      return allEvents;
+    }
+    position = 0;
+    hasMore = true;
+    while (hasMore && position < 2e4) {
+      const xmlPayload = `<?xml version="1.0" encoding="utf-8"?>
 <AcsEventCond xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0">
-  <searchID>${Date.now()}</searchID>
-  <searchResultPosition>0</searchResultPosition>
-  <maxResults>200</maxResults>
+  <searchID>${searchID}</searchID>
+  <searchResultPosition>${position}</searchResultPosition>
+  <maxResults>${maxResults}</maxResults>
   <major>0</major>
   <minor>0</minor>
   <startTime>${startStr}</startTime>
   <endTime>${endStr}</endTime>
 </AcsEventCond>`;
-    const resXml = await this.executeWithAuth("POST", "/ISAPI/AccessControl/AcsEvent", xmlPayload);
-    const xml = resXml.data;
-    const events = [];
-    const eventBlocks = xml.match(/<AcsEvent>[\s\S]*?<\/AcsEvent>/gi) || [];
-    const getTag = (block, tag) => {
-      const match = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
-      return match ? match[1].trim() : "";
-    };
-    eventBlocks.forEach((block) => {
-      const empNo = getTag(block, "employeeNoString") || getTag(block, "cardNo") || getTag(block, "employeeNo");
-      const time = getTag(block, "time");
-      const minor = parseInt(getTag(block, "minor") || "0", 10);
-      const major = parseInt(getTag(block, "major") || "5", 10);
-      const serialNo = getTag(block, "serialNo") || `${time}_${empNo}`;
-      if (empNo && time) {
-        let verifyMode = "FINGERPRINT";
-        if (minor === 76) verifyMode = "FACE";
-        if (minor === 1) verifyMode = "CARD";
-        events.push({
-          serialNo,
-          employeeNo: empNo.trim(),
-          time,
-          major,
-          minor,
-          verifyMode,
-          direction: "AUTO"
+      try {
+        const resXml = await this.executeWithAuth("POST", "/ISAPI/AccessControl/AcsEvent", xmlPayload);
+        const xml = resXml.data;
+        const eventBlocks = xml.match(/<AcsEvent>[\s\S]*?<\/AcsEvent>/gi) || [];
+        if (eventBlocks.length === 0) {
+          hasMore = false;
+          break;
+        }
+        const getTag = (block, tag) => {
+          const match = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
+          return match ? match[1].trim() : "";
+        };
+        eventBlocks.forEach((block) => {
+          const empNo = getTag(block, "employeeNoString") || getTag(block, "cardNo") || getTag(block, "employeeNo");
+          const time = getTag(block, "time");
+          const minor = parseInt(getTag(block, "minor") || "0", 10);
+          const major = parseInt(getTag(block, "major") || "5", 10);
+          const serialNo = getTag(block, "serialNo") || `${time}_${empNo}`;
+          if (empNo && time) {
+            let verifyMode = "FINGERPRINT";
+            if (minor === 76) verifyMode = "FACE";
+            if (minor === 1) verifyMode = "CARD";
+            const dedupKey = `${serialNo}_${empNo}_${time}`;
+            if (!eventSerialSet.has(dedupKey)) {
+              eventSerialSet.add(dedupKey);
+              allEvents.push({
+                serialNo,
+                employeeNo: empNo.trim(),
+                time,
+                major,
+                minor,
+                verifyMode,
+                direction: "AUTO"
+              });
+            }
+          }
         });
+        if (eventBlocks.length < maxResults) {
+          hasMore = false;
+        } else {
+          position += eventBlocks.length;
+        }
+      } catch {
+        hasMore = false;
       }
-    });
-    return events;
+    }
+    return allEvents;
   }
 };
 
@@ -481,7 +534,7 @@ var SqliteDatabaseManager = class {
     this.db.exec(schema);
   }
   saveToDisk() {
-    if (!this.db) return;
+    if (!this.db) return { success: false, error: "Database not initialized" };
     try {
       const data = this.db.export();
       const buffer = Buffer.from(data);
@@ -490,8 +543,10 @@ var SqliteDatabaseManager = class {
       const backupJsonPath = import_path.default.join(userDataPath, "lankahr_data_snapshot.json");
       const state = this.getFullState();
       import_fs.default.writeFileSync(backupJsonPath, JSON.stringify(state, null, 2), "utf-8");
+      return { success: true };
     } catch (err) {
       console.error("[SqliteDB] Error saving SQLite database to disk:", err);
+      return { success: false, error: err.message };
     }
   }
   getFullState() {
@@ -624,7 +679,10 @@ var SqliteDatabaseManager = class {
         });
       }
       this.db.exec("COMMIT");
-      this.saveToDisk();
+      const diskRes = this.saveToDisk();
+      if (!diskRes.success) {
+        return { success: false, error: diskRes.error };
+      }
       return { success: true };
     } catch (err) {
       if (this.db) {

@@ -268,7 +268,7 @@ export class DatabaseService {
     return initial;
   }
 
-  public static saveToStorage(state: DatabaseState): void {
+  public static async saveToStorage(state: DatabaseState): Promise<{ success: boolean; error?: string }> {
     try {
       state.lastUpdated = new Date().toISOString();
       const serialized = JSON.stringify(state);
@@ -279,16 +279,17 @@ export class DatabaseService {
 
       // Sync directly to SQLite database via Electron IPC
       if (typeof window !== 'undefined' && window.electronAPI?.dbSaveAll) {
-        window.electronAPI.dbSaveAll(state).then(res => {
-          if (!res.success) {
-            console.error('[DatabaseService] Electron SQLite write error:', res.error);
-          }
-        }).catch(err => {
-          console.error('[DatabaseService] IPC dbSaveAll error:', err);
-        });
+        const res = await window.electronAPI.dbSaveAll(state);
+        if (!res.success) {
+          console.error('[DatabaseService] Electron SQLite write error:', res.error);
+          return { success: false, error: res.error || 'Failed to write SQLite database to disk.' };
+        }
+        return { success: true };
       }
-    } catch (err) {
+      return { success: true };
+    } catch (err: any) {
       console.error('[DatabaseService] Failed to persist database:', err);
+      return { success: false, error: err.message || 'Database save failed' };
     }
   }
 

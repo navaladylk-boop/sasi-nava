@@ -62,7 +62,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const quickTiles = [
     { id: 'employees', label: t.employees, icon: Users, color: 'from-blue-600 to-blue-700', border: 'border-blue-500/40', desc: 'Add, Edit, Master list' },
     { id: 'attendance', label: t.attendance, icon: CalendarCheck, color: 'from-indigo-600 to-indigo-700', border: 'border-indigo-500/40', desc: 'Daily punch review & OT' },
-    { id: 'devices', label: t.fingerprintMachine, icon: Fingerprint, color: 'from-cyan-600 to-cyan-700', border: 'border-cyan-500/40', desc: 'IP Sync (ZKTeco/Hikvision)' },
+    { id: 'devices', label: t.fingerprintMachine, icon: Fingerprint, color: 'from-cyan-600 to-cyan-700', border: 'border-cyan-500/40', desc: 'Hikvision ISAPI IP Sync' },
     { id: 'leave', label: t.leave, icon: CalendarOff, color: 'from-amber-600 to-amber-700', border: 'border-amber-500/40', desc: 'Annual, Casual, No-Pay' },
     { id: 'payroll', label: t.payroll, icon: Calculator, color: 'from-emerald-600 to-emerald-700', border: 'border-emerald-500/40', desc: '1-Click Monthly Salary' },
     { id: 'salary-sheet', label: t.salarySheet, icon: TableProperties, color: 'from-teal-600 to-teal-700', border: 'border-teal-500/40', desc: 'Master sheet & Excel export' },
@@ -168,7 +168,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className="text-xs font-bold uppercase text-[#4b5563] group-hover:text-[#005a9e]">
                   Config Device
                 </span>
-                <span className="text-[10px] text-[#9ca3af] mt-0.5">ZKTeco/Hikvision</span>
+                <span className="text-[10px] text-[#9ca3af] mt-0.5">Hikvision ISAPI</span>
               </button>
 
               <button

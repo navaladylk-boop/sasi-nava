@@ -64,7 +64,7 @@ export interface Employee {
   isActive: boolean;
 }
 
-export type DeviceBrand = 'ZKTeco' | 'Hikvision' | 'Suprema' | 'Generic_TCP';
+export type DeviceBrand = 'Hikvision';
 export type CommunicationType = 'TCP_IP' | 'UDP' | 'RS485' | 'USB';
 export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'UNTESTED';
 

@@ -155,8 +155,8 @@ export class SqliteDatabaseManager {
     this.db.exec(schema);
   }
 
-  public saveToDisk(): void {
-    if (!this.db) return;
+  public saveToDisk(): { success: boolean; error?: string } {
+    if (!this.db) return { success: false, error: 'Database not initialized' };
     try {
       const data = this.db.export();
       const buffer = Buffer.from(data);
@@ -166,8 +166,10 @@ export class SqliteDatabaseManager {
       const backupJsonPath = path.join(userDataPath, 'lankahr_data_snapshot.json');
       const state = this.getFullState();
       fs.writeFileSync(backupJsonPath, JSON.stringify(state, null, 2), 'utf-8');
+      return { success: true };
     } catch (err: any) {
       console.error('[SqliteDB] Error saving SQLite database to disk:', err);
+      return { success: false, error: err.message };
     }
   }
 
@@ -317,7 +319,10 @@ export class SqliteDatabaseManager {
       }
 
       this.db.exec('COMMIT');
-      this.saveToDisk();
+      const diskRes = this.saveToDisk();
+      if (!diskRes.success) {
+        return { success: false, error: diskRes.error };
+      }
       return { success: true };
     } catch (err: any) {
       if (this.db) {
