@@ -152,6 +152,10 @@ export interface EmployeeLeave {
   status: 'APPROVED' | 'PENDING' | 'REJECTED';
   approvedBy?: string;
   appliedDate: string;
+  durationType?: 'FULL_DAY' | 'HALF_DAY' | 'SHORT_LEAVE';
+  startTime?: string; // HH:mm
+  endTime?: string; // HH:mm
+  durationMinutes?: number;
 }
 
 export type AllowanceRuleType =

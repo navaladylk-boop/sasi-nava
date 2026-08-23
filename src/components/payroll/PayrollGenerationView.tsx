@@ -76,12 +76,19 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
   const [isCalculating, setIsCalculating] = useState<boolean>(false);
   const [calculationStep, setCalculationStep] = useState<string>('');
   const [editingRecord, setEditingRecord] = useState<CalculatedSalaryRecord | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleCalculatePayroll = () => {
-    setIsCalculating(true);
+    setError(null);
     const workingDaysConfig = DatabaseService.getMonthlyWorkingDaysConfig(currentMonth);
-    const finalWorkingDays = workingDaysConfig.finalWorkingDays;
+    const finalWorkingDays = workingDaysConfig?.finalWorkingDays;
 
+    if (!finalWorkingDays || finalWorkingDays <= 0) {
+      setError("Final working days are not configured for this payroll month.");
+      return;
+    }
+
+    setIsCalculating(true);
     setCalculationStep('Step 1: Reading biometric attendance & leave records...');
 
     setTimeout(() => {
@@ -91,107 +98,113 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
         setTimeout(() => {
           setCalculationStep('Step 4: Computing Overtime (1.5x/2.0x) & Sri Lankan EPF/ETF (8%, 12%, 3%)...');
           setTimeout(() => {
-            const calculatedRecords: CalculatedSalaryRecord[] = [];
+            try {
+              const calculatedRecords: CalculatedSalaryRecord[] = [];
 
-            employees.filter(e => e.isActive).forEach(emp => {
-              // Extract employee attendance for the month
-              const empAtt = attendance.filter(
-                a => a.employeeId === emp.id && a.date.startsWith(currentMonth)
-              );
+              employees.filter(e => e.isActive).forEach(emp => {
+                // Extract employee attendance for the month
+                const empAtt = attendance.filter(
+                  a => a.employeeId === emp.id && a.date.startsWith(currentMonth)
+                );
 
-              const workedDaysFromAtt = empAtt.filter(a => a.status === 'PRESENT' || a.status === 'HALF_DAY').length;
-              const noPayDaysFromAtt = empAtt.filter(a => a.status === 'NO_PAY' || a.status === 'ABSENT').length;
+                const workedDaysFromAtt = empAtt.filter(a => a.status === 'PRESENT' || a.status === 'HALF_DAY').length;
+                const noPayDaysFromAtt = empAtt.filter(a => a.status === 'NO_PAY' || a.status === 'ABSENT').length;
 
-              // Read approved unpaid leaves for this employee in the month
-              const empLeaves = leaves.filter(
-                l => l.employeeId === emp.id &&
-                l.status === 'APPROVED' &&
-                (l.startDate.startsWith(currentMonth) || l.endDate.startsWith(currentMonth))
-              );
+                // Read approved unpaid leaves for this employee in the month
+                const empLeaves = leaves.filter(
+                  l => l.employeeId === emp.id &&
+                  l.status === 'APPROVED' &&
+                  (l.startDate.startsWith(currentMonth) || l.endDate.startsWith(currentMonth))
+                );
 
-              const noPayLeaveDays = empLeaves
-                .filter(l => {
-                  return l.leaveTypeId === 'lt-04' ||
-                         l.leaveTypeId === 'lt-4' ||
-                         l.leaveTypeId.toLowerCase().includes('no_pay') ||
-                         l.leaveTypeId.toLowerCase().includes('unpaid');
-                })
-                .reduce((sum, l) => sum + (Number(l.daysCount) || 0), 0);
+                const noPayLeaveDays = empLeaves
+                  .filter(l => {
+                    return l.leaveTypeId === 'lt-04' ||
+                           l.leaveTypeId === 'lt-4' ||
+                           l.leaveTypeId.toLowerCase().includes('no_pay') ||
+                           l.leaveTypeId.toLowerCase().includes('unpaid');
+                  })
+                  .reduce((sum, l) => sum + (Number(l.daysCount) || 0), 0);
 
-              // Total unpaid/no-pay days (max of attendance absence or leave requests)
-              const totalUnpaidDays = Math.max(noPayDaysFromAtt, noPayLeaveDays);
+                // Total unpaid/no-pay days (max of attendance absence or leave requests)
+                const totalUnpaidDays = Math.max(noPayDaysFromAtt, noPayLeaveDays);
 
-              const standardWorkingDays = finalWorkingDays;
-              const calculatedWorkedDays = workedDaysFromAtt > 0
-                ? workedDaysFromAtt
-                : Math.max(0, standardWorkingDays - totalUnpaidDays);
+                const standardWorkingDays = finalWorkingDays;
+                const calculatedWorkedDays = workedDaysFromAtt > 0
+                  ? workedDaysFromAtt
+                  : Math.max(0, standardWorkingDays - totalUnpaidDays);
 
-              const otHours = empAtt.reduce((sum, a) => sum + (Number(a.otHours) || 0), 0);
-              const lateMins = empAtt.reduce((sum, a) => sum + (Number(a.lateMinutes) || 0), 0);
-              const shortLeaveMins = empAtt.reduce((sum, a) => sum + (Number(a.shortLeaveMinutes) || 0), 0);
-              const timeLossMins = empAtt.reduce((sum, a) => sum + (Number(a.timeLossMinutes) || 0), 0);
+                const otHours = empAtt.reduce((sum, a) => sum + (Number(a.otHours) || 0), 0);
+                const lateMins = empAtt.reduce((sum, a) => sum + (Number(a.lateMinutes) || 0), 0);
+                const shortLeaveMins = empAtt.reduce((sum, a) => sum + (Number(a.shortLeaveMinutes) || 0), 0);
+                const timeLossMins = empAtt.reduce((sum, a) => sum + (Number(a.timeLossMinutes) || 0), 0);
 
-              // Read real approved incentives from DB
-              const employeeIncentives = incentives.filter(
-                i => i.employeeId === emp.id && i.payrollMonth === currentMonth
-              );
-              const realIncentiveTotal = employeeIncentives.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+                // Read real approved incentives from DB
+                const employeeIncentives = incentives.filter(
+                  i => i.employeeId === emp.id && i.payrollMonth === currentMonth
+                );
+                const realIncentiveTotal = employeeIncentives.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
 
-              // Preserve existing manual adjustments if present
-              const existingRecord = payrollPeriod?.records.find(r => r.employeeId === emp.id);
+                // Preserve existing manual adjustments if present
+                const existingRecord = payrollPeriod?.records.find(r => r.employeeId === emp.id);
 
-              const calc = PayrollEngine.calculateEmployeeSalary({
-                employee: emp,
-                workedDays: calculatedWorkedDays,
-                unpaidLeaveDays: totalUnpaidDays,
-                otHours,
-                lateMinutes: lateMins,
-                shortLeaveMinutes: shortLeaveMins,
-                timeLossMinutes: timeLossMins,
-                incentiveAmount: realIncentiveTotal > 0 ? realIncentiveTotal : (existingRecord?.incentives || 0),
-                loanDeduction: existingRecord?.loanDeductions || 0,
-                advanceDeduction: existingRecord?.salaryAdvance || 0,
-                otherDeductions: existingRecord?.otherDeductions || 0,
-                settings,
-                rules: allowanceRules,
-                categories: payrollCategories,
-                departments,
-                designations,
-                monthlyWorkingDays: finalWorkingDays
+                const calc = PayrollEngine.calculateEmployeeSalary({
+                  employee: emp,
+                  workedDays: calculatedWorkedDays,
+                  unpaidLeaveDays: totalUnpaidDays,
+                  otHours,
+                  lateMinutes: lateMins,
+                  shortLeaveMinutes: shortLeaveMins,
+                  timeLossMinutes: timeLossMins,
+                  incentiveAmount: realIncentiveTotal > 0 ? realIncentiveTotal : (existingRecord?.incentives || 0),
+                  loanDeduction: existingRecord?.loanDeductions || 0,
+                  advanceDeduction: existingRecord?.salaryAdvance || 0,
+                  otherDeductions: existingRecord?.otherDeductions || 0,
+                  settings,
+                  rules: allowanceRules,
+                  categories: payrollCategories,
+                  departments,
+                  designations,
+                  monthlyWorkingDays: finalWorkingDays
+                });
+
+                calculatedRecords.push({
+                  ...calc,
+                  id: existingRecord?.id || `sal-${emp.id}-${currentMonth}`
+                });
               });
 
-              calculatedRecords.push({
-                ...calc,
-                id: existingRecord?.id || `sal-${emp.id}-${currentMonth}`
-              });
-            });
+              // Aggregate period totals
+              const totalGross = calculatedRecords.reduce((sum, r) => sum + r.grossSalary, 0);
+              const totalNet = calculatedRecords.reduce((sum, r) => sum + r.netSalary, 0);
+              const totalEpf8 = calculatedRecords.reduce((sum, r) => sum + r.epfEmployeeAmount, 0);
+              const totalEpf12 = calculatedRecords.reduce((sum, r) => sum + r.epfEmployerAmount, 0);
+              const totalEtf3 = calculatedRecords.reduce((sum, r) => sum + r.etfEmployerAmount, 0);
 
-            // Aggregate period totals
-            const totalGross = calculatedRecords.reduce((sum, r) => sum + r.grossSalary, 0);
-            const totalNet = calculatedRecords.reduce((sum, r) => sum + r.netSalary, 0);
-            const totalEpf8 = calculatedRecords.reduce((sum, r) => sum + r.epfEmployeeAmount, 0);
-            const totalEpf12 = calculatedRecords.reduce((sum, r) => sum + r.epfEmployerAmount, 0);
-            const totalEtf3 = calculatedRecords.reduce((sum, r) => sum + r.etfEmployerAmount, 0);
+              const updatedPeriod: PayrollPeriod = {
+                id: payrollPeriod?.id || `pp-${currentMonth}`,
+                monthYear: currentMonth,
+                status: 'CALCULATED',
+                calculatedAt: new Date().toISOString(),
+                totalEmployees: calculatedRecords.length,
+                totalGross,
+                totalNet,
+                totalEpfEmployee: totalEpf8,
+                totalEpfEmployer: totalEpf12,
+                totalEtfEmployer: totalEtf3,
+                isEpfPaid: payrollPeriod?.isEpfPaid || false,
+                isEtfPaid: payrollPeriod?.isEtfPaid || false,
+                records: calculatedRecords
+              };
 
-            const updatedPeriod: PayrollPeriod = {
-              id: payrollPeriod?.id || `pp-${currentMonth}`,
-              monthYear: currentMonth,
-              status: 'CALCULATED',
-              calculatedAt: new Date().toISOString(),
-              totalEmployees: calculatedRecords.length,
-              totalGross,
-              totalNet,
-              totalEpfEmployee: totalEpf8,
-              totalEpfEmployer: totalEpf12,
-              totalEtfEmployer: totalEtf3,
-              isEpfPaid: payrollPeriod?.isEpfPaid || false,
-              isEtfPaid: payrollPeriod?.isEtfPaid || false,
-              records: calculatedRecords
-            };
-
-            onSavePayrollPeriod(updatedPeriod);
-            setIsCalculating(false);
-            setCalculationStep('');
+              onSavePayrollPeriod(updatedPeriod);
+              setIsCalculating(false);
+              setCalculationStep('');
+            } catch (err: any) {
+              setError(err.message || 'An unexpected error occurred during payroll calculation.');
+              setIsCalculating(false);
+              setCalculationStep('');
+            }
           }, 300);
         }, 300);
       }, 300);
@@ -261,6 +274,13 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
 
   return (
     <div className="flex-1 p-6 overflow-y-auto bg-[#f0f2f5] text-[#111827] space-y-6 font-sans">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-xs font-semibold flex justify-between items-center shadow-xs">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700 font-bold ml-2">Dismiss</button>
+        </div>
+      )}
+
       {/* Top Header & Calculation Launcher */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>

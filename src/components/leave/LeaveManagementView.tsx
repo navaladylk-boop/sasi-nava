@@ -102,6 +102,23 @@ export const LeaveManagementView: React.FC<LeaveManagementViewProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showUnsavedWarning, deleteTargetId, payrollWarningModal, isModalOpen, onBack, formData, initialFormSnapshot]);
 
+  // Calculate difference in minutes between HH:mm strings
+  const calculateDiffMinutes = (startStr: string, endStr: string): number => {
+    if (!startStr || !endStr) return 0;
+    const startParts = startStr.split(':');
+    const endParts = endStr.split(':');
+    if (startParts.length < 2 || endParts.length < 2) return 0;
+    const sH = parseInt(startParts[0], 10);
+    const sM = parseInt(startParts[1], 10);
+    const eH = parseInt(endParts[0], 10);
+    const eM = parseInt(endParts[1], 10);
+    if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) return 0;
+    
+    const startTotal = sH * 60 + sM;
+    const endTotal = eH * 60 + eM;
+    return endTotal - startTotal;
+  };
+
   // Open Add Modal
   const handleOpenAdd = () => {
     const defaultData = {
@@ -111,7 +128,11 @@ export const LeaveManagementView: React.FC<LeaveManagementViewProps> = ({
       endDate: new Date().toISOString().substring(0, 10),
       daysCount: 1,
       reason: '',
-      status: 'APPROVED' as const
+      status: 'APPROVED' as const,
+      durationType: 'FULL_DAY' as const,
+      startTime: '',
+      endTime: '',
+      durationMinutes: 0
     };
     setEditingLeaveId(null);
     setFormData(defaultData);
@@ -129,7 +150,11 @@ export const LeaveManagementView: React.FC<LeaveManagementViewProps> = ({
       endDate: leave.endDate,
       daysCount: leave.daysCount,
       reason: leave.reason,
-      status: leave.status
+      status: leave.status,
+      durationType: leave.durationType || 'FULL_DAY',
+      startTime: leave.startTime || '',
+      endTime: leave.endTime || '',
+      durationMinutes: leave.durationMinutes || 0
     };
     setEditingLeaveId(leave.id);
     setFormData(data);
@@ -193,6 +218,28 @@ export const LeaveManagementView: React.FC<LeaveManagementViewProps> = ({
       return;
     }
 
+    // Short leave validation
+    if (formData.durationType === 'SHORT_LEAVE') {
+      if (formData.startDate !== formData.endDate) {
+        setErrorMessage('Short Leave must be on a single day (Start Date and End Date must be identical).');
+        return;
+      }
+      if (!formData.startTime || !formData.endTime) {
+        setErrorMessage('Start Time and End Time are required for Short Leave.');
+        return;
+      }
+      const timeRegex = /^\d{1,2}:\d{2}$/;
+      if (!timeRegex.test(formData.startTime) || !timeRegex.test(formData.endTime)) {
+        setErrorMessage('Start Time and End Time must be in valid HH:mm format (e.g. 10:15).');
+        return;
+      }
+      const diff = calculateDiffMinutes(formData.startTime, formData.endTime);
+      if (diff <= 0) {
+        setErrorMessage('End time must be after start time.');
+        return;
+      }
+    }
+
     // Overlapping Leave Validation
     const overlap = leaves.find(l => {
       if (editingLeaveId && l.id === editingLeaveId) return false;
@@ -228,32 +275,30 @@ export const LeaveManagementView: React.FC<LeaveManagementViewProps> = ({
   const executeSave = async () => {
     setPayrollWarningModal({ show: false });
     try {
+      const payload: Partial<EmployeeLeave> = {
+        employeeId: formData.employeeId!,
+        leaveTypeId: formData.leaveTypeId!,
+        startDate: formData.startDate!,
+        endDate: formData.endDate!,
+        daysCount: formData.durationType === 'SHORT_LEAVE' ? 0 : (formData.daysCount || 1),
+        reason: formData.reason || '',
+        status: formData.status as any || 'APPROVED',
+        appliedDate: new Date().toISOString().substring(0, 10),
+        approvedBy: 'HR Admin',
+        durationType: formData.durationType || 'FULL_DAY',
+        startTime: formData.durationType === 'SHORT_LEAVE' ? formData.startTime : undefined,
+        endTime: formData.durationType === 'SHORT_LEAVE' ? formData.endTime : undefined,
+        durationMinutes: formData.durationType === 'SHORT_LEAVE' ? formData.durationMinutes : undefined,
+      };
+
       if (editingLeaveId) {
         await onSaveLeave({
+          ...payload,
           id: editingLeaveId,
-          employeeId: formData.employeeId!,
-          leaveTypeId: formData.leaveTypeId!,
-          startDate: formData.startDate!,
-          endDate: formData.endDate!,
-          daysCount: formData.daysCount || 1,
-          reason: formData.reason || '',
-          status: formData.status as any || 'APPROVED',
-          appliedDate: new Date().toISOString().substring(0, 10),
-          approvedBy: 'HR Admin'
-        });
+        } as EmployeeLeave);
         setSuccessMessage('Leave updated successfully.');
       } else {
-        await onSaveLeave({
-          employeeId: formData.employeeId!,
-          leaveTypeId: formData.leaveTypeId!,
-          startDate: formData.startDate!,
-          endDate: formData.endDate!,
-          daysCount: formData.daysCount || 1,
-          reason: formData.reason || '',
-          status: formData.status as any || 'APPROVED',
-          appliedDate: new Date().toISOString().substring(0, 10),
-          approvedBy: 'HR Admin'
-        });
+        await onSaveLeave(payload as EmployeeLeave);
         setSuccessMessage('Leave saved successfully.');
       }
       setIsModalOpen(false);
@@ -468,7 +513,14 @@ export const LeaveManagementView: React.FC<LeaveManagementViewProps> = ({
                         {l.startDate} → {l.endDate}
                       </td>
                       <td className="py-3 px-3 text-center font-bold text-[#111827]">
-                        {l.daysCount} d
+                        {l.durationType === 'SHORT_LEAVE' ? (
+                          <div className="text-[10px] text-blue-600 font-bold">
+                            {l.durationMinutes || 0} mins
+                            <div className="text-[9px] text-[#9ca3af] font-normal">({l.startTime} - {l.endTime})</div>
+                          </div>
+                        ) : (
+                          `${l.daysCount} d`
+                        )}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span
@@ -608,16 +660,95 @@ export const LeaveManagementView: React.FC<LeaveManagementViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-[#4b5563] mb-1 font-medium">Number of Days (Auto-calculated)</label>
-                <input
-                  type="number"
-                  min="0.5"
-                  step="0.5"
-                  value={formData.daysCount || 1}
-                  onChange={e => setFormData({ ...formData, daysCount: Number(e.target.value) })}
-                  className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono font-bold focus:border-[#005a9e] focus:outline-none"
-                />
+                <label className="block text-[#4b5563] mb-1 font-medium">Leave Duration Type</label>
+                <select
+                  value={formData.durationType || 'FULL_DAY'}
+                  onChange={e => {
+                    const dtype = e.target.value as 'FULL_DAY' | 'HALF_DAY' | 'SHORT_LEAVE';
+                    setFormData(prev => ({
+                      ...prev,
+                      durationType: dtype,
+                      daysCount: dtype === 'FULL_DAY' ? (prev.daysCount || 1) : dtype === 'HALF_DAY' ? 0.5 : 0,
+                      endDate: dtype === 'SHORT_LEAVE' ? (prev.startDate || new Date().toISOString().substring(0, 10)) : prev.endDate,
+                      startTime: dtype === 'SHORT_LEAVE' ? (prev.startTime || '10:00') : undefined,
+                      endTime: dtype === 'SHORT_LEAVE' ? (prev.endTime || '11:30') : undefined,
+                      durationMinutes: dtype === 'SHORT_LEAVE' ? (prev.durationMinutes || 90) : undefined,
+                    }));
+                  }}
+                  className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] focus:border-[#005a9e] focus:outline-none font-medium"
+                >
+                  <option value="FULL_DAY">Full Day</option>
+                  <option value="HALF_DAY">Half Day</option>
+                  <option value="SHORT_LEAVE">Short Leave</option>
+                </select>
               </div>
+
+              {formData.durationType === 'SHORT_LEAVE' ? (
+                <div className="grid grid-cols-2 gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div>
+                    <label className="block text-[#4b5563] mb-1 font-medium">Start Time (HH:mm)</label>
+                    <input
+                      type="text"
+                      placeholder="10:15"
+                      required
+                      value={formData.startTime || ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => {
+                          const minutes = calculateDiffMinutes(val, prev.endTime || '');
+                          return {
+                            ...prev,
+                            startTime: val,
+                            durationMinutes: minutes > 0 ? minutes : 0
+                          };
+                        });
+                      }}
+                      className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[#4b5563] mb-1 font-medium">End Time (HH:mm)</label>
+                    <input
+                      type="text"
+                      placeholder="11:45"
+                      required
+                      value={formData.endTime || ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setFormData(prev => {
+                          const minutes = calculateDiffMinutes(prev.startTime || '', val);
+                          return {
+                            ...prev,
+                            endTime: val,
+                            durationMinutes: minutes > 0 ? minutes : 0
+                          };
+                        });
+                      }}
+                      className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="col-span-2 text-center pt-1">
+                    <span className="font-bold text-[#005a9e]">
+                      Duration: {formData.durationMinutes || 0} Minutes
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[#4b5563] mb-1 font-medium">Number of Days (Auto-calculated)</label>
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    disabled={formData.durationType === 'HALF_DAY'}
+                    value={formData.daysCount || 1}
+                    onChange={e => setFormData({ ...formData, daysCount: Number(e.target.value) })}
+                    className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono font-bold focus:border-[#005a9e] focus:outline-none disabled:bg-[#f3f4f6]"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-[#4b5563] mb-1 font-medium">Status *</label>

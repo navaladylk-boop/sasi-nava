@@ -40,12 +40,15 @@ export class PayrollEngine {
     unpaidDays: number,
     rules: AllowanceDeductionRule[],
     ruleId?: string,
-    workingDays: number = 25
+    workingDays?: number
   ): {
     deductionAmount: number;
     remainingAllowance: number;
     breakdown: string;
   } {
+    if (!workingDays || workingDays <= 0) {
+      throw new Error('Final working days are not configured for this payroll month.');
+    }
     if (unpaidDays <= 0 || fixedAllowance <= 0) {
       return {
         deductionAmount: 0,
@@ -86,7 +89,7 @@ export class PayrollEngine {
         }
       }
     } else if (rule.ruleType === 'DAILY_PRORATA') {
-      const divisor = workingDays > 0 ? workingDays : 25;
+      const divisor = workingDays;
       const dailyRate = fixedAllowance / divisor;
       deduction = Math.round(dailyRate * unpaidDays);
       breakdownParts.push(`${unpaidDays} days × (Rs. ${fixedAllowance} ÷ ${divisor})`);
@@ -131,7 +134,10 @@ export class PayrollEngine {
       monthlyWorkingDays
     } = input;
 
-    const workingDays = monthlyWorkingDays || emp.workingDaysPerMonth || settings.defaultWorkingDaysPerMonth || 25;
+    const workingDays = monthlyWorkingDays || emp.workingDaysPerMonth || settings.defaultWorkingDaysPerMonth;
+    if (!workingDays || workingDays <= 0) {
+      throw new Error('Final working days are not configured for this payroll month.');
+    }
     const normalHours = emp.normalWorkingHours || settings.normalWorkingHoursPerDay || 8;
 
     // 1. Basic Salary & No-Pay basic deduction

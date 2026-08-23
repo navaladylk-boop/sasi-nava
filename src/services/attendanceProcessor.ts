@@ -103,17 +103,21 @@ export class AttendanceProcessor {
             dateStr <= l.endDate
         );
 
-        const isFullDayLeave = (leave: EmployeeLeave): boolean => {
-          if (leave.daysCount < 1.0) return false;
+        const getLeaveDurationType = (leave: EmployeeLeave): 'FULL_DAY' | 'HALF_DAY' | 'SHORT_LEAVE' => {
+          if (leave.durationType) return leave.durationType;
+          if (leave.durationMinutes && leave.durationMinutes > 0) return 'SHORT_LEAVE';
+          if (leave.daysCount === 0.5) return 'HALF_DAY';
           const reasonLower = (leave.reason || '').toLowerCase();
-          if (reasonLower.includes('half') || reasonLower.includes('short') || reasonLower.includes('partial')) {
-            return false;
-          }
+          if (reasonLower.includes('half')) return 'HALF_DAY';
+          if (reasonLower.includes('short')) return 'SHORT_LEAVE';
           const leaveTypeLower = (leave.leaveTypeId || '').toLowerCase();
-          if (leaveTypeLower.includes('half') || leaveTypeLower.includes('short')) {
-            return false;
-          }
-          return true;
+          if (leaveTypeLower.includes('half')) return 'HALF_DAY';
+          if (leaveTypeLower.includes('short')) return 'SHORT_LEAVE';
+          return leave.daysCount >= 1.0 ? 'FULL_DAY' : 'SHORT_LEAVE';
+        };
+
+        const isFullDayLeave = (leave: EmployeeLeave): boolean => {
+          return getLeaveDurationType(leave) === 'FULL_DAY';
         };
 
         const fullDayLeave = approvedLeaves.find(isFullDayLeave);
@@ -238,12 +242,51 @@ export class AttendanceProcessor {
           totalHours = normalDailyHours;
         }
 
-        // Calculate partial-day leave minutes (Approved Short Leave / Half Day)
-        const partialLeavesOnDate = approvedLeaves.filter(l => !isFullDayLeave(l));
-        const shortLeaveMins = partialLeavesOnDate.reduce((sum, l) => sum + Math.round((l.daysCount || 0) * 480), 0);
+        // Calculate partial-day leave minutes (Approved Short Leave)
+        const shortLeavesOnDate = approvedLeaves.filter(l => getLeaveDurationType(l) === 'SHORT_LEAVE');
+        let shortLeaveMins = 0;
+        shortLeavesOnDate.forEach(l => {
+          shortLeaveMins += l.durationMinutes || 0;
+        });
 
-        // Calculate total time loss for the day
-        const dayTimeLoss = lateMins + earlyMins + shortLeaveMins;
+        // Calculate unique time loss minutes with overlap protection
+        const uniqueMins = new Set<number>();
+        if (lateMins > 0) {
+          for (let m = shiftStartMinutes; m < inTotalMinutes; m++) {
+            uniqueMins.add(m);
+          }
+        }
+        if (earlyMins > 0 && lastOutTime) {
+          const [outH, outM] = lastOutTime.split(':').map(Number);
+          const outTotalMinutes = outH * 60 + outM;
+          for (let m = outTotalMinutes; m < shiftEndMinutes; m++) {
+            uniqueMins.add(m);
+          }
+        }
+        shortLeavesOnDate.forEach(l => {
+          if (l.startTime && l.endTime) {
+            const [sH, sM] = l.startTime.split(':').map(Number);
+            const [eH, eM] = l.endTime.split(':').map(Number);
+            const sTotal = sH * 60 + sM;
+            const eTotal = eH * 60 + eM;
+            if (eTotal > sTotal) {
+              for (let m = sTotal; m < eTotal; m++) {
+                uniqueMins.add(m);
+              }
+            }
+          } else {
+            const fallbackMins = Math.round((l.daysCount || 0) * 480);
+            shortLeaveMins += fallbackMins;
+            for (let m = shiftStartMinutes; m < shiftStartMinutes + fallbackMins; m++) {
+              uniqueMins.add(m);
+            }
+          }
+        });
+
+        // Calculate total unique time loss for the day
+        const dayTimeLoss = uniqueMins.size;
+
+        const hasHalfDayLeave = approvedLeaves.some(l => getLeaveDurationType(l) === 'HALF_DAY');
 
         results.push({
           id: `att-${emp.id}-${dateStr}`,
@@ -258,7 +301,7 @@ export class AttendanceProcessor {
           earlyLeaveMinutes: earlyMins,
           shortLeaveMinutes: shortLeaveMins,
           timeLossMinutes: dayTimeLoss,
-          status: 'PRESENT',
+          status: hasHalfDayLeave ? 'HALF_DAY' : 'PRESENT',
           isManualCorrection: false,
           remarks: otHours > 0 ? `Normal Shift + ${otHours} hrs OT` : (lateMins > 0 ? `Late by ${lateMins}m` : 'Normal Shift')
         });
