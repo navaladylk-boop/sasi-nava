@@ -366,7 +366,9 @@ ipcMain.handle('device:hikvision-download', async (event, config: HikvisionConfi
   try {
     console.log(`[Electron Hikvision] Downloading attendance from IP: ${config.ipAddress}:${config.port} (Range: ${startDate || 'ALL'} to ${endDate || 'ALL'})`);
     const client = new HikvisionISAPIClient(config);
-    const events = await client.getAttendanceEvents(startDate, endDate);
+    const events = await client.getAttendanceEvents(startDate, endDate, (progress) => {
+      event.sender.send('hikvision:download-progress', progress);
+    });
     return {
       success: true,
       events,
@@ -383,3 +385,5 @@ ipcMain.handle('device:hikvision-download', async (event, config: HikvisionConfi
     };
   }
 });
+
+export { SqliteDatabaseManager };

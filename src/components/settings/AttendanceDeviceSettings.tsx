@@ -67,17 +67,62 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
   const [testResult, setTestResult] = useState<HikvisionDeviceTestResult | null>(null);
 
   // Attendance Download States
-  const [startDate, setStartDate] = useState<string>(
-    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10)
-  );
-  const [endDate, setEndDate] = useState<string>(
-    new Date().toISOString().substring(0, 10)
-  );
+  const [startDate, setStartDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    const options: Intl.DateTimeFormatOptions = { timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit' };
+    const parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(d);
+    return `${parts.find(p => p.type === 'year')?.value}-${parts.find(p => p.type === 'month')?.value}-${parts.find(p => p.type === 'day')?.value}`;
+  });
+  const [endDate, setEndDate] = useState<string>(() => {
+    const options: Intl.DateTimeFormatOptions = { timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit' };
+    const parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(new Date());
+    return `${parts.find(p => p.type === 'year')?.value}-${parts.find(p => p.type === 'month')?.value}-${parts.find(p => p.type === 'day')?.value}`;
+  });
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [downloadProgressText, setDownloadProgressText] = useState<string>('');
   const [syncReport, setSyncReport] = useState<HikvisionSyncReport | null>(null);
 
   // Save feedback
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+
+  // Helper for Sri Lanka date string (Asia/Colombo)
+  const getSriLankaDateStr = (d = new Date()) => {
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: 'Asia/Colombo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    };
+    const parts = new Intl.DateTimeFormat('en-CA', options).formatToParts(d);
+    const year = parts.find(p => p.type === 'year')?.value;
+    const month = parts.find(p => p.type === 'month')?.value;
+    const day = parts.find(p => p.type === 'day')?.value;
+    return `${year}-${month}-${day}`;
+  };
+
+  const handlePresetDate = (preset: 'TODAY' | 'YESTERDAY' | 'CURRENT_MONTH' | 'ALL') => {
+    const now = new Date();
+    if (preset === 'TODAY') {
+      const todayStr = getSriLankaDateStr(now);
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (preset === 'YESTERDAY') {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yestStr = getSriLankaDateStr(yesterday);
+      setStartDate(yestStr);
+      setEndDate(yestStr);
+    } else if (preset === 'CURRENT_MONTH') {
+      const todayStr = getSriLankaDateStr(now);
+      const firstDayStr = `${todayStr.substring(0, 7)}-01`;
+      setStartDate(firstDayStr);
+      setEndDate(todayStr);
+    } else if (preset === 'ALL') {
+      setStartDate('');
+      setEndDate('');
+    }
+  };
 
   // Mapping state
   const [selectedUnmappedId, setSelectedUnmappedId] = useState<string>('');
@@ -139,6 +184,7 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
   const handleDownloadAttendance = async () => {
     setIsDownloading(true);
     setSyncReport(null);
+    setDownloadProgressText('Initiating Hikvision connection...');
 
     try {
       const report = await HikvisionService.downloadAttendance(
@@ -146,7 +192,10 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
         rawPunches,
         employees,
         startDate,
-        endDate
+        endDate,
+        (progress) => {
+          setDownloadProgressText(progress.statusText);
+        }
       );
       setSyncReport(report);
 
@@ -169,6 +218,7 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
       });
     } finally {
       setIsDownloading(false);
+      setDownloadProgressText('');
     }
   };
 
@@ -445,9 +495,43 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
 
       {/* 2. Attendance Download Section */}
       <div className="bg-white border border-[#d1d5db] rounded-xl p-5 shadow-xs space-y-4">
-        <div className="flex items-center gap-2 border-b border-[#e5e7eb] pb-3">
-          <DownloadCloud className="w-5 h-5 text-[#005a9e]" />
-          <h2 className="text-sm font-bold text-[#111827]">Download Attendance Records</h2>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-[#e5e7eb] pb-3">
+          <div className="flex items-center gap-2">
+            <DownloadCloud className="w-5 h-5 text-[#005a9e]" />
+            <h2 className="text-sm font-bold text-[#111827]">Download Attendance Records</h2>
+          </div>
+          {/* Quick Date Presets */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-[#64748b] font-medium mr-1 text-[11px]">Presets:</span>
+            <button
+              type="button"
+              onClick={() => handlePresetDate('TODAY')}
+              className="px-2 py-1 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] rounded font-medium border border-[#cbd5e1] text-[11px] cursor-pointer"
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePresetDate('YESTERDAY')}
+              className="px-2 py-1 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] rounded font-medium border border-[#cbd5e1] text-[11px] cursor-pointer"
+            >
+              Yesterday
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePresetDate('CURRENT_MONTH')}
+              className="px-2 py-1 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] rounded font-medium border border-[#cbd5e1] text-[11px] cursor-pointer"
+            >
+              Current Month
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePresetDate('ALL')}
+              className="px-2 py-1 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#334155] rounded font-medium border border-[#cbd5e1] text-[11px] cursor-pointer"
+            >
+              All Available Records
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs items-end">
@@ -485,6 +569,16 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
           </div>
         </div>
 
+        {/* Live Progress Banner */}
+        {isDownloading && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3 text-xs text-blue-900 animate-pulse">
+            <RefreshCw className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+            <div className="whitespace-pre-line font-medium">
+              {downloadProgressText || 'Downloading Hikvision attendance...'}
+            </div>
+          </div>
+        )}
+
         {/* Sync Metric Statistics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs bg-[#f8fafc] p-3 rounded-lg border border-[#e2e8f0]">
           <div>
@@ -515,10 +609,10 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
 
         {syncReport && (
           <div
-            className={`p-3 rounded-lg border text-xs ${
+            className={`p-4 rounded-lg border text-xs whitespace-pre-line font-mono ${
               syncReport.success
-                ? 'bg-blue-50 border-blue-200 text-blue-900'
-                : 'bg-amber-50 border-amber-200 text-amber-900'
+                ? 'bg-blue-50/80 border-blue-200 text-blue-950'
+                : 'bg-amber-50/80 border-amber-200 text-amber-950'
             }`}
           >
             {syncReport.message}

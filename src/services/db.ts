@@ -335,7 +335,7 @@ export class DatabaseService {
     return (this.state.employees || []).find(e => e.id === id);
   }
 
-  public static saveEmployee(employeeData: Partial<Employee>, userRole: string = 'Admin'): Employee {
+  public static async saveEmployee(employeeData: Partial<Employee>, userRole: string = 'Admin'): Promise<Employee> {
     console.log('[EMPLOYEE_SAVE] FORM_SUBMIT', {
       employeeCode: employeeData.employeeCode,
       fullName: employeeData.fullName,
@@ -363,6 +363,9 @@ export class DatabaseService {
     const existingIdx = employeeData.id
       ? this.state.employees.findIndex(e => e.id === employeeData.id)
       : this.state.employees.findIndex(e => e.employeeCode.toLowerCase() === code.toLowerCase());
+
+    const previousEmployeeState = existingIdx !== -1 ? { ...this.state.employees[existingIdx] } : null;
+    const isNew = existingIdx === -1;
 
     let savedEmployee: Employee;
 
@@ -425,7 +428,17 @@ export class DatabaseService {
       this.logAudit('ADD_EMPLOYEE', `Registered employee ${savedEmployee.employeeCode} - ${savedEmployee.fullName}`, userRole);
     }
 
-    this.saveToStorage(this.state);
+    const saveResult = await this.saveToStorage(this.state);
+    if (!saveResult.success) {
+      if (isNew) {
+        this.state.employees = this.state.employees.filter(e => e.id !== savedEmployee.id);
+      } else if (previousEmployeeState && existingIdx !== -1) {
+        this.state.employees[existingIdx] = previousEmployeeState;
+      }
+      console.error('[EMPLOYEE_SAVE] DATABASE_SAVE_FAILED:', saveResult.error);
+      throw new Error(saveResult.error || 'Failed to save employee to SQLite database.');
+    }
+
     console.log('[EMPLOYEE_SAVE] DATABASE_SAVE_SUCCESS', {
       id: savedEmployee.id,
       employeeCode: savedEmployee.employeeCode,
@@ -435,11 +448,18 @@ export class DatabaseService {
     return savedEmployee;
   }
 
-  public static deleteEmployee(id: string, userRole: string = 'Admin'): void {
+  public static async deleteEmployee(id: string, userRole: string = 'Admin'): Promise<void> {
     const emp = this.getEmployeeById(id);
+    const previousEmployees = [...this.state.employees];
     this.state.employees = this.state.employees.filter(e => e.id !== id);
     this.logAudit('DELETE_EMPLOYEE', `Deleted employee ${emp?.employeeCode || id}`, userRole);
-    this.saveToStorage(this.state);
+
+    const saveResult = await this.saveToStorage(this.state);
+    if (!saveResult.success) {
+      this.state.employees = previousEmployees;
+      console.error('[EMPLOYEE_DELETE] DATABASE_DELETE_FAILED:', saveResult.error);
+      throw new Error(saveResult.error || 'Failed to delete employee from SQLite database.');
+    }
   }
 
   // Departments & Designations CRUD

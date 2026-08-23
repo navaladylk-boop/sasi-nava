@@ -4,6 +4,10 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -20,8 +24,14 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // electron/main.ts
+var main_exports = {};
+__export(main_exports, {
+  SqliteDatabaseManager: () => SqliteDatabaseManager
+});
+module.exports = __toCommonJS(main_exports);
 var import_electron2 = require("electron");
 var import_path2 = __toESM(require("path"), 1);
 var import_fs2 = __toESM(require("fs"), 1);
@@ -1050,5 +1060,9 @@ import_electron2.ipcMain.handle("device:hikvision-download", async (event, confi
       message: `Failed to download attendance logs: ${err.message}`
     };
   }
+});
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  SqliteDatabaseManager
 });
 //# sourceMappingURL=main.cjs.map

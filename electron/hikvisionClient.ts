@@ -303,10 +303,29 @@ export class HikvisionISAPIClient {
   }
 
   // Download Attendance Event Records (ISAPI AcsEvent with pagination)
-  public async getAttendanceEvents(startDate?: string, endDate?: string): Promise<HikvisionEventLog[]> {
-    const now = new Date();
-    const startStr = startDate ? `${startDate}T00:00:00+05:30` : `${now.toISOString().substring(0, 10)}T00:00:00+05:30`;
-    const endStr = endDate ? `${endDate}T23:59:59+05:30` : `${now.toISOString().substring(0, 10)}T23:59:59+05:30`;
+  public async getAttendanceEvents(
+    startDate?: string,
+    endDate?: string,
+    onProgress?: (progressInfo: { totalFetched: number; currentBatchSize: number }) => void
+  ): Promise<HikvisionEventLog[]> {
+    // Format start/end date in Sri Lanka (+05:30) timezone
+    const formatTimeForHikvision = (dateStr?: string, isEnd = false): string => {
+      if (!dateStr || dateStr.trim() === '') {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const dStr = `${yyyy}-${mm}-${dd}`;
+        return isEnd ? `${dStr}T23:59:59+05:30` : `${dStr}T00:00:00+05:30`;
+      }
+      if (dateStr.includes('T')) {
+        return dateStr;
+      }
+      return isEnd ? `${dateStr}T23:59:59+05:30` : `${dateStr}T00:00:00+05:30`;
+    };
+
+    const startStr = formatTimeForHikvision(startDate, false);
+    const endStr = formatTimeForHikvision(endDate, true);
 
     const maxResults = 200;
     const searchID = `lankahr-${Date.now()}`;
@@ -318,7 +337,7 @@ export class HikvisionISAPIClient {
     let hasMore = true;
     let jsonSuccess = false;
 
-    while (hasMore && position < 20000) {
+    while (hasMore) {
       const jsonPayload = JSON.stringify({
         AcsEventCond: {
           searchID,
@@ -351,6 +370,7 @@ export class HikvisionISAPIClient {
               let verifyMode: 'FINGERPRINT' | 'FACE' | 'CARD' | 'PASSWORD' = 'FINGERPRINT';
               if (item.currentVerifyMode === 'face' || item.minor === 76) verifyMode = 'FACE';
               else if (item.currentVerifyMode === 'card' || item.minor === 1) verifyMode = 'CARD';
+              else if (item.currentVerifyMode === 'pwd' || item.minor === 77) verifyMode = 'PASSWORD';
 
               let direction: 'IN' | 'OUT' | 'AUTO' = 'AUTO';
               if (item.attendanceStatus === 'checkIn' || item.type === 0) direction = 'IN';
@@ -374,6 +394,10 @@ export class HikvisionISAPIClient {
               }
             }
           });
+
+          if (onProgress) {
+            onProgress({ totalFetched: allEvents.length, currentBatchSize: matches.length });
+          }
 
           if (matches.length < maxResults || (totalMatches && position + matches.length >= totalMatches)) {
             hasMore = false;
@@ -399,7 +423,7 @@ export class HikvisionISAPIClient {
     position = 0;
     hasMore = true;
 
-    while (hasMore && position < 20000) {
+    while (hasMore) {
       const xmlPayload = `<?xml version="1.0" encoding="utf-8"?>
 <AcsEventCond xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0">
   <searchID>${searchID}</searchID>
@@ -434,9 +458,10 @@ export class HikvisionISAPIClient {
           const serialNo = getTag(block, 'serialNo') || `${time}_${empNo}`;
 
           if (empNo && time) {
-            let verifyMode = 'FINGERPRINT';
+            let verifyMode: 'FINGERPRINT' | 'FACE' | 'CARD' | 'PASSWORD' = 'FINGERPRINT';
             if (minor === 76) verifyMode = 'FACE';
-            if (minor === 1) verifyMode = 'CARD';
+            else if (minor === 1) verifyMode = 'CARD';
+            else if (minor === 77) verifyMode = 'PASSWORD';
 
             const dedupKey = `${serialNo}_${empNo}_${time}`;
             if (!eventSerialSet.has(dedupKey)) {
@@ -453,6 +478,10 @@ export class HikvisionISAPIClient {
             }
           }
         });
+
+        if (onProgress) {
+          onProgress({ totalFetched: allEvents.length, currentBatchSize: eventBlocks.length });
+        }
 
         if (eventBlocks.length < maxResults) {
           hasMore = false;

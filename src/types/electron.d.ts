@@ -48,6 +48,9 @@ export interface ElectronAPI {
     startDate?: string,
     endDate?: string
   ) => Promise<HikvisionDownloadResponse>;
+  onHikvisionProgress?: (
+    callback: (progress: { totalFetched: number; currentBatchSize: number }) => void
+  ) => () => void;
 }
 
 declare global {

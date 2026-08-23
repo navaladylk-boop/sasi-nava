@@ -16,7 +16,9 @@ import {
   Fingerprint,
   DollarSign,
   Briefcase,
-  Landmark
+  Landmark,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { Employee, Department, Designation, PayrollCategory, Language } from '../../types';
 import { translations } from '../../i18n/translations';
@@ -27,8 +29,8 @@ interface EmployeeMasterViewProps {
   departments: Department[];
   designations: Designation[];
   payrollCategories: PayrollCategory[];
-  onSaveEmployee: (emp: Partial<Employee>) => void;
-  onDeleteEmployee: (id: string) => void;
+  onSaveEmployee: (emp: Partial<Employee>) => Promise<Employee> | void;
+  onDeleteEmployee: (id: string) => Promise<void> | void;
 }
 
 export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
@@ -71,8 +73,11 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
   }, [employees, searchTerm, selectedDept, selectedStatus]);
 
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('');
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string>('');
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const handleOpenAddModal = () => {
+    setSaveErrorMsg('');
     setEditingEmployee({
       employeeCode: `EMP00${employees.length + 1}`,
       fullName: '',
@@ -110,14 +115,18 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
   };
 
   const handleOpenEditModal = (emp: Employee) => {
+    setSaveErrorMsg('');
     setEditingEmployee({ ...emp });
     setActiveModalTab('general');
     setIsModalOpen(true);
   };
 
-  const handleSaveModal = (e: React.FormEvent) => {
+  const handleSaveModal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingEmployee) return;
+    if (!editingEmployee || isSaving) return;
+
+    setSaveErrorMsg('');
+    setSaveSuccessMsg('');
 
     const code = editingEmployee.employeeCode?.trim();
     const name = editingEmployee.fullName?.trim();
@@ -183,11 +192,21 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
       isActive: editingEmployee.isActive !== false
     };
 
-    onSaveEmployee(payload);
-    setIsModalOpen(false);
-    setEditingEmployee(null);
-    setSaveSuccessMsg(`Employee "${name}" (${code}) saved successfully.`);
-    setTimeout(() => setSaveSuccessMsg(''), 4000);
+    setIsSaving(true);
+    try {
+      await onSaveEmployee(payload);
+      // ONLY AFTER SQLite write completes & confirms success:
+      setIsModalOpen(false);
+      setEditingEmployee(null);
+      setSaveSuccessMsg(`Employee "${name}" (${code}) saved successfully.`);
+      setTimeout(() => setSaveSuccessMsg(''), 4000);
+    } catch (err: any) {
+      const errorText = err.message || 'Failed to save employee to SQLite database.';
+      setSaveErrorMsg(`Failed to save employee: ${errorText}`);
+      alert(`Failed to save employee: ${errorText}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handlePrintList = () => {
@@ -244,6 +263,13 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
         <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-lg text-xs font-semibold shadow-xs animate-fade-in">
           <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
           {saveSuccessMsg}
+        </div>
+      )}
+
+      {saveErrorMsg && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-800 px-4 py-2.5 rounded-lg text-xs font-semibold shadow-xs animate-fade-in">
+          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+          {saveErrorMsg}
         </div>
       )}
 
@@ -401,9 +427,19 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
                         </button>
                         <button
                           id={`del-emp-${emp.id}`}
-                          onClick={() => {
+                          onClick={async () => {
                             if (confirm(`Are you sure you want to deactivate/delete ${emp.fullName} (${emp.employeeCode})?`)) {
-                              onDeleteEmployee(emp.id);
+                              setSaveErrorMsg('');
+                              setSaveSuccessMsg('');
+                              try {
+                                await onDeleteEmployee(emp.id);
+                                setSaveSuccessMsg(`Employee "${emp.fullName}" (${emp.employeeCode}) deleted successfully.`);
+                                setTimeout(() => setSaveSuccessMsg(''), 4000);
+                              } catch (err: any) {
+                                const errorText = err.message || 'Failed to delete employee from database.';
+                                setSaveErrorMsg(`Failed to delete employee: ${errorText}`);
+                                alert(`Failed to delete employee: ${errorText}`);
+                              }
                             }
                           }}
                           title="Delete / Deactivate"
@@ -914,16 +950,23 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
               <div className="pt-4 border-t border-[#e5e7eb] flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-white hover:bg-[#f9fafb] border border-[#d1d5db] text-[#374151] rounded-lg font-semibold shadow-xs"
+                  disabled={isSaving}
+                  onClick={() => {
+                    if (!isSaving) {
+                      setIsModalOpen(false);
+                    }
+                  }}
+                  className="px-4 py-2 bg-white hover:bg-[#f9fafb] border border-[#d1d5db] text-[#374151] rounded-lg font-semibold shadow-xs disabled:opacity-50"
                 >
                   {t.cancel}
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#005a9e] hover:bg-[#004880] text-white rounded-lg font-semibold shadow-xs"
+                  disabled={isSaving}
+                  className="px-5 py-2 bg-[#005a9e] hover:bg-[#004880] text-white rounded-lg font-semibold shadow-xs disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
-                  {t.save}
+                  {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isSaving ? 'Saving...' : t.save}
                 </button>
               </div>
             </form>

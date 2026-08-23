@@ -54,6 +54,7 @@ export interface ElectronAPI {
   readFile: (filePath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
   testHikvisionDevice: (config: HikvisionDeviceConfig) => Promise<HikvisionDeviceTestResult>;
   downloadHikvisionAttendance: (config: HikvisionDeviceConfig, startDate?: string, endDate?: string) => Promise<HikvisionDownloadResponse>;
+  onHikvisionProgress?: (callback: (progress: { totalFetched: number; currentBatchSize: number }) => void) => () => void;
 }
 
 declare global {

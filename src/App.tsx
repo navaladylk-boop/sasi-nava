@@ -93,15 +93,16 @@ export default function App() {
   };
 
   // Handler: Save Employee
-  const handleSaveEmployee = (emp: Partial<Employee>) => {
-    DatabaseService.saveEmployee(emp, currentUserRole);
-    setEmployees(DatabaseService.getEmployees());
+  const handleSaveEmployee = async (emp: Partial<Employee>): Promise<Employee> => {
+    const saved = await DatabaseService.saveEmployee(emp, currentUserRole);
+    setEmployees([...DatabaseService.getEmployees()]);
+    return saved;
   };
 
   // Handler: Delete Employee
-  const handleDeleteEmployee = (id: string) => {
-    DatabaseService.deleteEmployee(id, currentUserRole);
-    setEmployees(DatabaseService.getEmployees());
+  const handleDeleteEmployee = async (id: string): Promise<void> => {
+    await DatabaseService.deleteEmployee(id, currentUserRole);
+    setEmployees([...DatabaseService.getEmployees()]);
   };
 
   // Handler: Save Biometric Device

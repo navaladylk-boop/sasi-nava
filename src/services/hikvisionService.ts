@@ -109,32 +109,51 @@ export class HikvisionService {
     existingPunches: RawAttendancePunch[],
     employees: Employee[],
     startDate?: string,
-    endDate?: string
+    endDate?: string,
+    onProgress?: (progressInfo: { totalFetched: number; statusText: string }) => void
   ): Promise<HikvisionSyncReport> {
     const config: HikvisionDeviceConfig = {
       ipAddress: device.ipAddress.trim(),
       port: Number(device.port) || 80,
       username: device.username || 'admin',
       password: device.password || '',
-      timeoutMs: 8000,
+      timeoutMs: 15000,
       useHttps: device.port === 443
     };
 
     let downloadResponse: HikvisionDownloadResponse;
 
-    if (typeof window !== 'undefined' && window.electronAPI?.downloadHikvisionAttendance) {
-      downloadResponse = await window.electronAPI.downloadHikvisionAttendance(config, startDate, endDate);
-    } else {
-      // In browser preview mode, attempt real fetch or return honest diagnostic
-      return {
-        success: false,
-        message: `BLOCKED — PHYSICAL DEVICE TEST REQUIRED: Device ${device.ipAddress}:${device.port} is on the local physical network. Please run in Windows Desktop Mode (npm run electron:dev) to pull punches directly.`,
-        totalFetched: 0,
-        newRecordsCount: 0,
-        duplicateRecordsCount: 0,
-        unmappedCount: 0,
-        punches: []
-      };
+    let cleanupProgress: (() => void) | undefined;
+    if (typeof window !== 'undefined' && window.electronAPI?.onHikvisionProgress) {
+      cleanupProgress = window.electronAPI.onHikvisionProgress((p) => {
+        if (onProgress) {
+          onProgress({
+            totalFetched: p.totalFetched,
+            statusText: `Downloading Hikvision attendance...\nDownloaded: ${p.totalFetched.toLocaleString()} records`
+          });
+        }
+      });
+    }
+
+    try {
+      if (typeof window !== 'undefined' && window.electronAPI?.downloadHikvisionAttendance) {
+        downloadResponse = await window.electronAPI.downloadHikvisionAttendance(config, startDate, endDate);
+      } else {
+        // In browser preview mode, attempt real fetch or return honest diagnostic
+        return {
+          success: false,
+          message: `BLOCKED — PHYSICAL DEVICE TEST REQUIRED: Device ${device.ipAddress}:${device.port} is on the local physical network. Please run in Windows Desktop Mode (npm run electron:dev) to pull punches directly.`,
+          totalFetched: 0,
+          newRecordsCount: 0,
+          duplicateRecordsCount: 0,
+          unmappedCount: 0,
+          punches: []
+        };
+      }
+    } finally {
+      if (cleanupProgress) {
+        cleanupProgress();
+      }
     }
 
     if (!downloadResponse.success) {
@@ -238,10 +257,13 @@ export class HikvisionService {
       newPunches.push(punchRecord);
     });
 
+    const totalDownloaded = downloadResponse.events.length;
+    const finalSummaryMessage = `Attendance synchronization completed.\n\nTotal downloaded: ${totalDownloaded.toLocaleString()}\nNew records: ${newPunches.length.toLocaleString()}\nDuplicates skipped: ${duplicateCount.toLocaleString()}${unmappedCount > 0 ? `\nUnmapped Person IDs: ${unmappedCount.toLocaleString()}` : ''}`;
+
     return {
       success: true,
-      message: `Downloaded ${downloadResponse.events.length} records. (${newPunches.length} new, ${duplicateCount} duplicates skipped, ${unmappedCount} unmapped).`,
-      totalFetched: downloadResponse.events.length,
+      message: finalSummaryMessage,
+      totalFetched: totalDownloaded,
       newRecordsCount: newPunches.length,
       duplicateRecordsCount: duplicateCount,
       unmappedCount,
