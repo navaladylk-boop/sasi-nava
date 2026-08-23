@@ -81,6 +81,27 @@ export const LeaveManagementView: React.FC<LeaveManagementViewProps> = ({
   const getEmp = (id: string) => employees.find(e => e.id === id);
   const getLeaveType = (id: string) => leaveTypes.find(lt => lt.id === id);
 
+  // ESC key keydown handler
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showUnsavedWarning) {
+          setShowUnsavedWarning(false);
+        } else if (deleteTargetId) {
+          setDeleteTargetId(null);
+        } else if (payrollWarningModal.show) {
+          setPayrollWarningModal({ show: false });
+        } else if (isModalOpen) {
+          handleCloseModalAttempt();
+        } else if (onBack) {
+          onBack();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showUnsavedWarning, deleteTargetId, payrollWarningModal, isModalOpen, onBack, formData, initialFormSnapshot]);
+
   // Open Add Modal
   const handleOpenAdd = () => {
     const defaultData = {

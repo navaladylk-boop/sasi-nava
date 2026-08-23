@@ -313,11 +313,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <label className="block text-[#4b5563] mb-1 font-medium">Shift Start Time</label>
               <input
                 type="text"
-                placeholder="08:30"
+                placeholder="08:00"
                 value={formSettings.shiftStartTime}
                 onChange={e => setFormSettings({ ...formSettings, shiftStartTime: e.target.value })}
                 className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
               />
+            </div>
+
+            <div>
+              <label className="block text-[#4b5563] mb-1 font-medium">Shift End Time</label>
+              <input
+                type="text"
+                placeholder="17:00"
+                value={formSettings.shiftEndTime}
+                onChange={e => setFormSettings({ ...formSettings, shiftEndTime: e.target.value })}
+                className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[#4b5563] mb-1 font-medium">Break Time (Minutes)</label>
+              <input
+                type="number"
+                min="0"
+                value={formSettings.breakTimeMinutes ?? 0}
+                onChange={e => setFormSettings({ ...formSettings, breakTimeMinutes: Number(e.target.value) })}
+                className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
+              />
+              <span className="text-[10px] text-[#6b7280]">Break duration (e.g. 0 or 60)</span>
             </div>
 
             <div>
@@ -331,6 +354,44 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
               />
               <span className="text-[10px] text-[#6b7280]">Default 15 minutes</span>
+            </div>
+
+            <div>
+              <label className="block text-[#4b5563] mb-1 font-medium">Short Leave Allowance (Mins)</label>
+              <input
+                type="number"
+                min="0"
+                value={formSettings.shortLeaveAllowanceMinutes ?? 300}
+                onChange={e => setFormSettings({ ...formSettings, shortLeaveAllowanceMinutes: Number(e.target.value) })}
+                className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none"
+              />
+              <span className="text-[10px] text-[#6b7280]">Default 300 mins (5 hours)</span>
+            </div>
+
+            <div>
+              <label className="block text-[#4b5563] mb-1 font-medium">Short Leave Rate Type</label>
+              <select
+                value={formSettings.shortLeaveRateType ?? 'AUTOMATIC'}
+                onChange={e => setFormSettings({ ...formSettings, shortLeaveRateType: e.target.value as 'AUTOMATIC' | 'FIXED' })}
+                className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] focus:border-[#005a9e] focus:outline-none font-medium"
+              >
+                <option value="AUTOMATIC">Automatic (Basic ÷ Divisor ÷ Hours ÷ 60)</option>
+                <option value="FIXED">Fixed Minute Rate</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[#4b5563] mb-1 font-medium">Fixed Minute Rate (Rs.)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                disabled={(formSettings.shortLeaveRateType ?? 'AUTOMATIC') === 'AUTOMATIC'}
+                value={formSettings.shortLeaveFixedMinuteRate ?? 2.50}
+                onChange={e => setFormSettings({ ...formSettings, shortLeaveFixedMinuteRate: Number(e.target.value) })}
+                className="w-full bg-white border border-[#d1d5db] rounded-lg px-3 py-2 text-[#111827] font-mono focus:border-[#005a9e] focus:outline-none disabled:bg-[#f3f4f6] disabled:text-[#9ca3af]"
+              />
+              <span className="text-[10px] text-[#6b7280]">Used if Fixed Rate is selected</span>
             </div>
           </div>
         </div>

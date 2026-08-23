@@ -192,11 +192,19 @@ export class PayrollEngine {
     const etfEmployerAmount = isEtfEnabled ? Math.round((epfLiableSalary * etfEmplrRate) / 100) : 0;
 
     // 6. Deductions & Net Salary
-    // Short Leave / Time Loss calculation: 5 hours (300 mins) free monthly allowance
+    // Short Leave / Time Loss calculation with configurable free monthly allowance
+    const allowanceMinutes = settings.shortLeaveAllowanceMinutes !== undefined ? settings.shortLeaveAllowanceMinutes : 300;
     const eligibleTimeLoss = timeLossMinutes !== undefined ? timeLossMinutes : (lateMinutes || 0);
-    const excessTimeLoss = Math.max(0, eligibleTimeLoss - 300);
-    const hourlyRate = (workingDays * normalHours) > 0 ? (basicSalary / (workingDays * normalHours)) : 0;
-    const shortLeaveDeduction = Math.round(excessTimeLoss * (hourlyRate / 60));
+    const excessTimeLoss = Math.max(0, eligibleTimeLoss - allowanceMinutes);
+    
+    let minuteRate = 0;
+    if (settings.shortLeaveRateType === 'FIXED' && settings.shortLeaveFixedMinuteRate !== undefined) {
+      minuteRate = settings.shortLeaveFixedMinuteRate;
+    } else {
+      // Automatic Minute Rate = basicSalary / workingDays / normalHours / 60
+      minuteRate = (workingDays > 0 && normalHours > 0) ? (basicSalary / workingDays / normalHours / 60) : 0;
+    }
+    const shortLeaveDeduction = Math.round(excessTimeLoss * minuteRate);
 
     const totalDeductions = epfEmployeeAmount + advanceDeduction + loanDeduction + otherDeductions + shortLeaveDeduction;
     const netSalary = Math.max(0, grossSalary - totalDeductions);

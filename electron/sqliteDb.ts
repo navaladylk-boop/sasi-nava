@@ -150,6 +150,30 @@ export class SqliteDatabaseManager {
         action TEXT,
         data TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS holidays (
+        id TEXT PRIMARY KEY,
+        holiday_date TEXT,
+        holiday_name TEXT,
+        holiday_type TEXT,
+        year INTEGER,
+        created_at TEXT,
+        updated_at TEXT,
+        data TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS monthly_working_days (
+        id TEXT PRIMARY KEY,
+        year INTEGER,
+        month TEXT,
+        auto_working_days INTEGER,
+        manual_override INTEGER,
+        manual_working_days INTEGER,
+        final_working_days INTEGER,
+        updated_by TEXT,
+        updated_at TEXT,
+        data TEXT NOT NULL
+      );
     `;
 
     this.db.exec(schema);
@@ -215,6 +239,8 @@ export class SqliteDatabaseManager {
     const incentives = readTable('incentives');
     const payrollPeriods = readTable('payroll_periods');
     const auditLogs = readTable('audit_logs');
+    const holidays = readTable('holidays');
+    const monthlyWorkingDays = readTable('monthly_working_days');
 
     // Read system metadata
     let version = 3;
@@ -245,7 +271,9 @@ export class SqliteDatabaseManager {
       employeeLeaves,
       incentives,
       payrollPeriods,
-      auditLogs
+      auditLogs,
+      holidays,
+      monthlyWorkingDays
     };
   }
 
@@ -283,11 +311,37 @@ export class SqliteDatabaseManager {
         if (Array.isArray(items) && items.length > 0) {
           items.forEach(item => {
             const id = getId(item) || `${tableName}-${Date.now()}-${Math.random()}`;
-            this.db!.run(`INSERT INTO ${tableName} (id, data, updated_at) VALUES (?, ?, ?)`, [
-              id,
-              JSON.stringify(item),
-              new Date().toISOString()
-            ]);
+            if (tableName === 'holidays') {
+              this.db!.run(`INSERT INTO holidays (id, holiday_date, holiday_name, holiday_type, year, created_at, updated_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+                id,
+                item.date || '',
+                item.name || '',
+                item.type || 'Poya',
+                item.year || 0,
+                new Date().toISOString(),
+                new Date().toISOString(),
+                JSON.stringify(item)
+              ]);
+            } else if (tableName === 'monthly_working_days') {
+              this.db!.run(`INSERT INTO monthly_working_days (id, year, month, auto_working_days, manual_override, manual_working_days, final_working_days, updated_by, updated_at, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+                id,
+                item.year || 0,
+                item.month || '',
+                item.autoWorkingDays || 0,
+                item.manualOverride ? 1 : 0,
+                item.manualWorkingDays || 0,
+                item.finalWorkingDays || 0,
+                item.updatedBy || '',
+                item.updatedAt || new Date().toISOString(),
+                JSON.stringify(item)
+              ]);
+            } else {
+              this.db!.run(`INSERT INTO ${tableName} (id, data, updated_at) VALUES (?, ?, ?)`, [
+                id,
+                JSON.stringify(item),
+                new Date().toISOString()
+              ]);
+            }
           });
         }
       };
@@ -304,6 +358,8 @@ export class SqliteDatabaseManager {
       replaceTable('employee_leaves', state.employeeLeaves, i => i.id);
       replaceTable('incentives', state.incentives, i => i.id);
       replaceTable('payroll_periods', state.payrollPeriods, i => i.id);
+      replaceTable('holidays', state.holidays || [], i => i.id);
+      replaceTable('monthly_working_days', state.monthlyWorkingDays || [], i => i.id);
 
       // Audit logs (preserve or replace)
       if (Array.isArray(state.auditLogs)) {

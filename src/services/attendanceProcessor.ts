@@ -75,7 +75,7 @@ export class AttendanceProcessor {
     const shiftStartMinutes = shiftStartH * 60 + shiftStartM;
     const shiftEndMinutes = shiftEndH * 60 + shiftEndM;
     const graceMinutes = settings.lateGraceMinutes || 15;
-    const normalDailyHours = settings.defaultWorkingHours || 8;
+    const normalDailyHours = settings.normalWorkingHoursPerDay || settings.defaultWorkingHours || 8;
 
     // Process each active employee for every day of the month
     employees.forEach(emp => {
@@ -220,8 +220,9 @@ export class AttendanceProcessor {
             const workedMinutes = outTotalMinutes - inTotalMinutes;
             totalHours = +(workedMinutes / 60).toFixed(1);
 
-            // Deduct standard 1 hour lunch break if worked > 5 hours
-            const netMinutes = workedMinutes > 300 ? workedMinutes - 60 : workedMinutes;
+            // Deduct break duration if breakTimeMinutes is configured and worked duration exceeds 5 hours (300 mins)
+            const breakTime = settings.breakTimeMinutes !== undefined ? settings.breakTimeMinutes : 60;
+            const netMinutes = (breakTime > 0 && workedMinutes > 300) ? workedMinutes - breakTime : workedMinutes;
             const netHours = +(netMinutes / 60).toFixed(1);
 
             if (netHours > normalDailyHours) {

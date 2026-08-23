@@ -339,6 +339,10 @@ export interface CompanySettings {
   shiftStartTime: string; // "08:30"
   shiftEndTime: string; // "17:00"
   lateGraceMinutes: number; // 15
+  breakTimeMinutes?: number; // Break time in minutes (default 60)
+  shortLeaveAllowanceMinutes?: number; // Free short leave minutes per month (default 300)
+  shortLeaveRateType?: 'AUTOMATIC' | 'FIXED'; // AUTOMATIC or FIXED
+  shortLeaveFixedMinuteRate?: number; // Fixed rate per minute if shortLeaveRateType is FIXED
   epfEmployeeRate: number; // 8
   epfEmployeePercent?: number;
   epfEmployerRate: number; // 12
