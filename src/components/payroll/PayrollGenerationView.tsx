@@ -102,7 +102,12 @@ export const PayrollGenerationView: React.FC<PayrollGenerationViewProps> = ({
               );
 
               const noPayLeaveDays = empLeaves
-                .filter(l => l.leaveTypeId === 'lt-04' || l.leaveTypeId.toLowerCase().includes('no_pay') || l.leaveTypeId.toLowerCase().includes('unpaid'))
+                .filter(l => {
+                  return l.leaveTypeId === 'lt-04' ||
+                         l.leaveTypeId === 'lt-4' ||
+                         l.leaveTypeId.toLowerCase().includes('no_pay') ||
+                         l.leaveTypeId.toLowerCase().includes('unpaid');
+                })
                 .reduce((sum, l) => sum + (Number(l.daysCount) || 0), 0);
 
               // Total unpaid/no-pay days (max of attendance absence or leave requests)

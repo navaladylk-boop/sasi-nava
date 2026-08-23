@@ -37,8 +37,8 @@ export const OrgStructureSettings: React.FC<OrgStructureSettingsProps> = ({
   onDeleteDepartment,
   onSaveDesignation,
   onDeleteDesignation,
-  onSavePayrollCategory = () => {},
-  onDeletePayrollCategory = () => ({ success: true })
+  onSavePayrollCategory = (_cat: Partial<PayrollCategory>) => {},
+  onDeletePayrollCategory = (_id: string): { success: boolean; message?: string } => ({ success: true, message: '' })
 }) => {
   const t = translations[language];
 

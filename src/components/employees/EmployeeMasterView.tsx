@@ -15,7 +15,8 @@ import {
   CreditCard,
   Fingerprint,
   DollarSign,
-  Briefcase
+  Briefcase,
+  Landmark
 } from 'lucide-react';
 import { Employee, Department, Designation, PayrollCategory, Language } from '../../types';
 import { translations } from '../../i18n/translations';
@@ -120,16 +121,45 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
 
     const code = editingEmployee.employeeCode?.trim();
     const name = editingEmployee.fullName?.trim();
+    const nic = editingEmployee.nic?.trim();
+    const basicSalary = Number(editingEmployee.basicSalary);
+    const isEpfEnabled = editingEmployee.epfEnabled !== false;
+    const epfNumber = editingEmployee.epfNumber?.trim();
+    const fingerprintUserId = editingEmployee.fingerprintUserId?.trim();
 
     if (!code) {
-      alert('Please enter an Employee ID / Code.');
+      alert('Employee ID / Code is required.');
       setActiveModalTab('general');
       return;
     }
 
     if (!name) {
-      alert('Please enter the Employee Full Name.');
+      alert('Employee Full Name is required.');
       setActiveModalTab('general');
+      return;
+    }
+
+    if (!nic) {
+      alert('NIC Number is required.');
+      setActiveModalTab('general');
+      return;
+    }
+
+    if (!basicSalary || isNaN(basicSalary) || basicSalary <= 0) {
+      alert('Basic Salary is required and must be greater than 0.');
+      setActiveModalTab('salary');
+      return;
+    }
+
+    if (isEpfEnabled && !epfNumber) {
+      alert('EPF Member Number is required when EPF is enabled.');
+      setActiveModalTab('salary');
+      return;
+    }
+
+    if (!fingerprintUserId) {
+      alert('Fingerprint User ID is required.');
+      setActiveModalTab('device');
       return;
     }
 
@@ -137,16 +167,17 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
       ...editingEmployee,
       employeeCode: code,
       fullName: name,
-      basicSalary: Number(editingEmployee.basicSalary) || 0,
+      nic,
+      basicSalary: basicSalary,
       fixedAllowance: Number(editingEmployee.fixedAllowance) || 0,
       otherAllowance: Number(editingEmployee.otherAllowance) || 0,
       workingDaysPerMonth: Number(editingEmployee.workingDaysPerMonth) || 25,
       normalWorkingHours: Number(editingEmployee.normalWorkingHours) || 8,
-      epfNumber: editingEmployee.epfNumber || code,
-      etfNumber: editingEmployee.etfNumber || code,
-      epfEnabled: editingEmployee.epfEnabled !== false,
+      epfNumber: isEpfEnabled ? epfNumber : (epfNumber || code),
+      etfNumber: editingEmployee.etfNumber?.trim() || epfNumber || code,
+      epfEnabled: isEpfEnabled,
       etfEnabled: editingEmployee.etfEnabled !== false,
-      fingerprintUserId: editingEmployee.fingerprintUserId || code,
+      fingerprintUserId,
       departmentId: editingEmployee.departmentId || departments[0]?.id || '',
       designationId: editingEmployee.designationId || designations[0]?.id || '',
       isActive: editingEmployee.isActive !== false

@@ -192,15 +192,19 @@ export const WindowFrame: React.FC<WindowFrameProps> = ({
       {/* Main Content Viewport */}
       <div className="flex-1 flex overflow-hidden">{children}</div>
 
-      {/* Professional Polish Desktop Status Footer */}
+      {/* Professional Desktop Status Footer */}
       <footer className="no-print h-8 bg-white border-t border-[#d1d5db] flex items-center justify-between px-6 shrink-0 select-none text-[11px] font-medium text-[#6b7280]">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
-            Database: <span className="text-emerald-700 font-bold uppercase flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Online (Local)</span>
+            Database: <span className="text-emerald-700 font-bold uppercase flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> SQLite (Active)</span>
           </span>
           <span className="text-gray-300">•</span>
           <span className="flex items-center gap-1.5">
-            Biometric Terminal: <span className="text-[#005a9e] font-semibold">ZKTeco K40 & Hikvision (Ready)</span>
+            Hikvision: <span className="text-[#005a9e] font-semibold">Configured (DS-K1A8503MF @ 192.168.1.201)</span>
+          </span>
+          <span className="text-gray-300">•</span>
+          <span className="flex items-center gap-1.5">
+            ZKTeco: <span className="text-amber-700 font-semibold">Protocol Not Implemented</span>
           </span>
         </div>
         <div className="text-[11px] text-[#9ca3af] font-normal">

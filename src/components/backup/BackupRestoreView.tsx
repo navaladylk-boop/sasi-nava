@@ -161,7 +161,7 @@ export const BackupRestoreView: React.FC<BackupRestoreViewProps> = ({
           </div>
 
           <p className="text-xs text-[#4b5563] leading-relaxed bg-[#f8fafc] p-3 rounded-lg border border-[#e2e8f0]">
-            Exports all employee master profiles, department structures, raw biometric punch logs, attendance corrections, and calculated monthly salary sheets into an encrypted backup archive.
+            Exports all employee master profiles, department structures, raw biometric punch logs, attendance corrections, and calculated monthly salary sheets into a local structured database snapshot file (.db / .json).
           </p>
 
           <button
