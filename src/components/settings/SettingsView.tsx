@@ -9,11 +9,22 @@ import {
   CheckCircle2,
   ShieldCheck,
   UserCheck,
-  Radio
+  Radio,
+  Briefcase
 } from 'lucide-react';
-import { CompanySettings, Language, UserRole, FingerprintDevice, RawAttendancePunch, Employee } from '../../types';
+import {
+  CompanySettings,
+  Language,
+  UserRole,
+  FingerprintDevice,
+  RawAttendancePunch,
+  Employee,
+  Department,
+  Designation
+} from '../../types';
 import { translations } from '../../i18n/translations';
 import { AttendanceDeviceSettings } from './AttendanceDeviceSettings';
+import { OrgStructureSettings } from './OrgStructureSettings';
 
 interface SettingsViewProps {
   language: Language;
@@ -25,6 +36,12 @@ interface SettingsViewProps {
   devices?: FingerprintDevice[];
   rawPunches?: RawAttendancePunch[];
   employees?: Employee[];
+  departments?: Department[];
+  designations?: Designation[];
+  onSaveDepartment?: (dept: Partial<Department>) => void;
+  onDeleteDepartment?: (id: string) => { success: boolean; message?: string };
+  onSaveDesignation?: (desig: Partial<Designation>) => void;
+  onDeleteDesignation?: (id: string) => { success: boolean; message?: string };
   onSaveDevice?: (device: Partial<FingerprintDevice>) => void;
   onPunchesDownloaded?: (punches: RawAttendancePunch[]) => void;
   onUpdateEmployee?: (emp: Partial<Employee>) => void;
@@ -40,13 +57,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   devices = [],
   rawPunches = [],
   employees = [],
+  departments = [],
+  designations = [],
+  onSaveDepartment = () => {},
+  onDeleteDepartment = () => ({ success: true }),
+  onSaveDesignation = () => {},
+  onDeleteDesignation = () => ({ success: true }),
   onSaveDevice = () => {},
   onPunchesDownloaded = () => {},
   onUpdateEmployee = () => {}
 }) => {
   const t = translations[language];
 
-  const [activeSubTab, setActiveSubTab] = useState<'general' | 'device'>('general');
+  const [activeSubTab, setActiveSubTab] = useState<'general' | 'org' | 'device'>('general');
   const [formSettings, setFormSettings] = useState<CompanySettings>({ ...settings });
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
@@ -67,7 +90,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             {t.companySettings}
           </h1>
           <p className="text-xs text-[#6b7280] mt-0.5">
-            Configure company registration, EPF registration number, working hours, statutory rates, and biometric attendance devices.
+            Configure company registration, EPF registration number, working hours, statutory rates, organizational structure, and biometric devices.
           </p>
         </div>
 
@@ -96,6 +119,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         <button
           type="button"
+          onClick={() => setActiveSubTab('org')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+            activeSubTab === 'org'
+              ? 'border-[#005a9e] text-[#005a9e] bg-white rounded-t-lg shadow-2xs'
+              : 'border-transparent text-[#6b7280] hover:text-[#111827]'
+          }`}
+        >
+          <Briefcase className="w-4 h-4" />
+          Departments & Designations
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveSubTab('device')}
           className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
             activeSubTab === 'device'
@@ -117,6 +153,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           onSaveDevice={onSaveDevice}
           onPunchesDownloaded={onPunchesDownloaded}
           onUpdateEmployee={onUpdateEmployee}
+        />
+      ) : activeSubTab === 'org' ? (
+        <OrgStructureSettings
+          language={language}
+          departments={departments}
+          designations={designations}
+          onSaveDepartment={onSaveDepartment}
+          onDeleteDepartment={onDeleteDepartment}
+          onSaveDesignation={onSaveDesignation}
+          onDeleteDesignation={onDeleteDesignation}
         />
       ) : (
         <form onSubmit={handleSubmit} className="space-y-6">

@@ -13,7 +13,8 @@ import {
   PayrollPeriod,
   CompanySettings,
   AuditLog,
-  UserRole
+  UserRole,
+  IncentiveRecord
 } from '../types';
 
 export interface DatabaseState {
@@ -29,6 +30,7 @@ export interface DatabaseState {
   processedAttendance: ProcessedAttendance[];
   leaveTypes: LeaveType[];
   employeeLeaves: EmployeeLeave[];
+  incentives: IncentiveRecord[];
   allowanceRules: AllowanceDeductionRule[];
   payrollCategories: PayrollCategory[];
   payrollPeriods: PayrollPeriod[];
@@ -458,6 +460,7 @@ function getInitialDatabase(): DatabaseState {
     processedAttendance: processed,
     leaveTypes: initialLeaveTypes,
     employeeLeaves: [],
+    incentives: [],
     allowanceRules: initialAllowanceRules,
     payrollCategories: initialCategories,
     payrollPeriods: [],
@@ -474,6 +477,12 @@ export class DatabaseService {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed.employees && parsed.companySettings) {
+          // Ensure all arrays are initialized
+          if (!parsed.incentives) parsed.incentives = [];
+          if (!parsed.employeeLeaves) parsed.employeeLeaves = [];
+          if (!parsed.departments) parsed.departments = initialDepartments;
+          if (!parsed.designations) parsed.designations = initialDesignations;
+          if (!parsed.allowanceRules) parsed.allowanceRules = initialAllowanceRules;
           return parsed;
         }
       }
@@ -488,7 +497,17 @@ export class DatabaseService {
   private static saveToStorage(state: DatabaseState): void {
     try {
       state.lastUpdated = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      const serialized = JSON.stringify(state);
+      localStorage.setItem(STORAGE_KEY, serialized);
+
+      // Async write to Electron userData if running in Electron
+      if (typeof window !== 'undefined' && (window as any).electronAPI?.writeFile) {
+        try {
+          (window as any).electronAPI.writeFile('lankahr_data.json', serialized).catch(() => {});
+        } catch {
+          // Ignore desktop sync error
+        }
+      }
     } catch (err) {
       console.error('Failed to write database to localStorage', err);
     }
@@ -539,7 +558,7 @@ export class DatabaseService {
       return this.state.employees[idx];
     } else {
       const newEmp: Employee = {
-        id: `emp-${Date.now()}`,
+        id: employee.id || `emp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         employeeCode: employee.employeeCode || `EMP-${Date.now().toString().slice(-4)}`,
         fullName: employee.fullName || 'New Employee',
         nameSinhala: employee.nameSinhala || '',
@@ -550,23 +569,23 @@ export class DatabaseService {
         address: employee.address || '',
         telephone: employee.telephone || '',
         email: employee.email || '',
-        departmentId: employee.departmentId || initialDepartments[0].id,
-        designationId: employee.designationId || initialDesignations[0].id,
+        departmentId: employee.departmentId || (this.state.departments[0]?.id || 'dept-01'),
+        designationId: employee.designationId || (this.state.designations[0]?.id || 'des-01'),
         joinDate: employee.joinDate || new Date().toISOString().slice(0, 10),
         employmentStatus: employee.employmentStatus || 'PERMANENT',
         epfNumber: employee.epfNumber || 'EPF-0000',
-        basicSalary: employee.basicSalary || 50000,
-        fixedAllowance: employee.fixedAllowance || 10000,
-        otherAllowance: employee.otherAllowance || 0,
+        basicSalary: Number(employee.basicSalary) || 30000,
+        fixedAllowance: Number(employee.fixedAllowance) || 5000,
+        otherAllowance: Number(employee.otherAllowance) || 0,
         bankName: employee.bankName || 'Bank of Ceylon',
         bankAccountNumber: employee.bankAccountNumber || '',
         branch: employee.branch || 'Colombo',
-        payrollCategoryId: 'cat-01',
-        workingDaysPerMonth: 25,
-        normalWorkingHours: 8,
-        otRateType: '1.5X_STANDARD',
-        fingerprintUserId: employee.fingerprintUserId || `${Date.now().toString().slice(-4)}`,
-        isActive: true,
+        payrollCategoryId: employee.payrollCategoryId || 'cat-01',
+        workingDaysPerMonth: Number(employee.workingDaysPerMonth) || 25,
+        normalWorkingHours: Number(employee.normalWorkingHours) || 8,
+        otRateType: employee.otRateType || '1.5X_STANDARD',
+        fingerprintUserId: employee.fingerprintUserId || employee.employeeCode || `${Date.now().toString().slice(-4)}`,
+        isActive: employee.isActive !== undefined ? employee.isActive : true,
         ...employee
       };
       this.state.employees.push(newEmp);
@@ -583,13 +602,78 @@ export class DatabaseService {
     this.saveToStorage(this.state);
   }
 
-  // Departments & Designations
+  // Departments & Designations CRUD
   public static getDepartments(): Department[] {
-    return this.state.departments;
+    return this.state.departments || initialDepartments;
+  }
+
+  public static saveDepartment(dept: Partial<Department>, userRole: string = 'Admin'): Department {
+    if (dept.id && this.state.departments.some(d => d.id === dept.id)) {
+      const idx = this.state.departments.findIndex(d => d.id === dept.id);
+      this.state.departments[idx] = { ...this.state.departments[idx], ...dept } as Department;
+      this.logAudit('UPDATE_DEPARTMENT', `Updated department ${this.state.departments[idx].name}`, userRole);
+      this.saveToStorage(this.state);
+      return this.state.departments[idx];
+    } else {
+      const newDept: Department = {
+        id: dept.id || `dept-${Date.now()}`,
+        code: dept.code || `DEP-${Date.now().toString().slice(-3)}`,
+        name: dept.name || 'New Department',
+        nameSinhala: dept.nameSinhala || '',
+        nameTamil: dept.nameTamil || ''
+      };
+      this.state.departments.push(newDept);
+      this.logAudit('ADD_DEPARTMENT', `Created department ${newDept.name}`, userRole);
+      this.saveToStorage(this.state);
+      return newDept;
+    }
+  }
+
+  public static deleteDepartment(id: string, userRole: string = 'Admin'): { success: boolean; message?: string } {
+    const hasAssigned = this.state.employees.some(e => e.departmentId === id);
+    if (hasAssigned) {
+      return { success: false, message: 'Cannot delete department: Employees are currently assigned to it.' };
+    }
+    this.state.departments = this.state.departments.filter(d => d.id !== id);
+    this.logAudit('DELETE_DEPARTMENT', `Deleted department ${id}`, userRole);
+    this.saveToStorage(this.state);
+    return { success: true };
   }
 
   public static getDesignations(): Designation[] {
-    return this.state.designations;
+    return this.state.designations || initialDesignations;
+  }
+
+  public static saveDesignation(desig: Partial<Designation>, userRole: string = 'Admin'): Designation {
+    if (desig.id && this.state.designations.some(d => d.id === desig.id)) {
+      const idx = this.state.designations.findIndex(d => d.id === desig.id);
+      this.state.designations[idx] = { ...this.state.designations[idx], ...desig } as Designation;
+      this.logAudit('UPDATE_DESIGNATION', `Updated designation ${this.state.designations[idx].title}`, userRole);
+      this.saveToStorage(this.state);
+      return this.state.designations[idx];
+    } else {
+      const newDesig: Designation = {
+        id: desig.id || `des-${Date.now()}`,
+        code: desig.code || `DES-${Date.now().toString().slice(-3)}`,
+        title: desig.title || 'New Designation',
+        departmentId: desig.departmentId || this.state.departments[0]?.id || 'dept-01'
+      };
+      this.state.designations.push(newDesig);
+      this.logAudit('ADD_DESIGNATION', `Created designation ${newDesig.title}`, userRole);
+      this.saveToStorage(this.state);
+      return newDesig;
+    }
+  }
+
+  public static deleteDesignation(id: string, userRole: string = 'Admin'): { success: boolean; message?: string } {
+    const hasAssigned = this.state.employees.some(e => e.designationId === id);
+    if (hasAssigned) {
+      return { success: false, message: 'Cannot delete designation: Employees are currently assigned to it.' };
+    }
+    this.state.designations = this.state.designations.filter(d => d.id !== id);
+    this.logAudit('DELETE_DESIGNATION', `Deleted designation ${id}`, userRole);
+    this.saveToStorage(this.state);
+    return { success: true };
   }
 
   // Biometric Devices
@@ -606,15 +690,18 @@ export class DatabaseService {
       return this.state.devices[idx];
     } else {
       const newDev: FingerprintDevice = {
-        id: `dev-${Date.now()}`,
-        name: device.name || 'New Fingerprint Device',
-        brand: device.brand || 'ZKTeco',
-        model: device.model || 'Standard Standalone',
+        id: device.id || `dev-${Date.now()}`,
+        name: device.name || 'Hikvision Attendance Device',
+        brand: device.brand || 'Hikvision',
+        model: device.model || 'DS-K1A8503MF',
         ipAddress: device.ipAddress || '192.168.1.201',
-        port: device.port || 4370,
+        port: device.port || 80,
+        username: device.username || 'admin',
+        password: device.password || '',
         communicationType: device.communicationType || 'TCP_IP',
-        status: 'ONLINE',
+        status: device.status || 'UNTESTED',
         lastSyncTime: new Date().toISOString().slice(0, 16).replace('T', ' '),
+        serialNumber: device.serialNumber || '',
         ...device
       };
       this.state.devices.push(newDev);
@@ -661,6 +748,41 @@ export class DatabaseService {
     this.saveToStorage(this.state);
   }
 
+  public static saveManualAttendance(record: Partial<ProcessedAttendance>, userRole: string = 'Admin'): ProcessedAttendance {
+    const existingIdx = record.id ? this.state.processedAttendance.findIndex(a => a.id === record.id) : -1;
+    if (existingIdx !== -1) {
+      this.state.processedAttendance[existingIdx] = {
+        ...this.state.processedAttendance[existingIdx],
+        ...record,
+        isManualCorrection: true
+      } as ProcessedAttendance;
+      this.logAudit('UPDATE_ATTENDANCE', `Updated manual attendance on ${record.date} for emp ${record.employeeId}`, userRole);
+      this.saveToStorage(this.state);
+      return this.state.processedAttendance[existingIdx];
+    } else {
+      const newAtt: ProcessedAttendance = {
+        id: record.id || `att-man-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        employeeId: record.employeeId || '',
+        date: record.date || new Date().toISOString().substring(0, 10),
+        firstIn: record.firstIn || '08:30',
+        lastOut: record.lastOut || '17:00',
+        totalHours: Number(record.totalHours) || 8.5,
+        normalHours: Number(record.normalHours) || 8,
+        otHours: Number(record.otHours) || 0,
+        lateMinutes: Number(record.lateMinutes) || 0,
+        earlyLeaveMinutes: Number(record.earlyLeaveMinutes) || 0,
+        status: record.status || 'PRESENT',
+        isManualCorrection: true,
+        remarks: record.remarks || 'Manual Entry',
+        ...record
+      };
+      this.state.processedAttendance.push(newAtt);
+      this.logAudit('ADD_ATTENDANCE', `Added manual attendance for emp ${newAtt.employeeId} on ${newAtt.date}`, userRole);
+      this.saveToStorage(this.state);
+      return newAtt;
+    }
+  }
+
   public static updateAttendanceRecord(
     id: string,
     updates: Partial<ProcessedAttendance>,
@@ -678,29 +800,44 @@ export class DatabaseService {
     return this.state.processedAttendance[idx];
   }
 
+  public static deleteAttendanceRecord(id: string, userRole: string = 'Admin'): void {
+    this.state.processedAttendance = this.state.processedAttendance.filter(a => a.id !== id);
+    this.logAudit('DELETE_ATTENDANCE', `Deleted attendance entry ${id}`, userRole);
+    this.saveToStorage(this.state);
+  }
+
   // Leave Management
   public static getLeaveTypes(): LeaveType[] {
     return this.state.leaveTypes;
   }
 
   public static getLeaves(): EmployeeLeave[] {
-    return this.state.employeeLeaves;
+    return this.state.employeeLeaves || [];
   }
 
-  public static saveLeave(leave: Omit<EmployeeLeave, 'id'>, userRole: string = 'Admin'): EmployeeLeave {
-    const newLeave: EmployeeLeave = {
-      ...leave,
-      id: `leave-${Date.now()}`
-    };
-    this.state.employeeLeaves.push(newLeave);
-    this.logAudit('APPLY_LEAVE', `Applied leave for emp ${leave.employeeId} (${leave.daysCount} days)`, userRole);
-    this.saveToStorage(this.state);
-    return newLeave;
+  public static saveLeave(leave: Omit<EmployeeLeave, 'id'> | EmployeeLeave, userRole: string = 'Admin'): EmployeeLeave {
+    const existingId = (leave as EmployeeLeave).id;
+    if (existingId && this.state.employeeLeaves.some(l => l.id === existingId)) {
+      const idx = this.state.employeeLeaves.findIndex(l => l.id === existingId);
+      this.state.employeeLeaves[idx] = { ...this.state.employeeLeaves[idx], ...leave } as EmployeeLeave;
+      this.logAudit('UPDATE_LEAVE', `Updated leave record for emp ${leave.employeeId}`, userRole);
+      this.saveToStorage(this.state);
+      return this.state.employeeLeaves[idx];
+    } else {
+      const newLeave: EmployeeLeave = {
+        ...leave,
+        id: `leave-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`
+      };
+      this.state.employeeLeaves.push(newLeave);
+      this.logAudit('APPLY_LEAVE', `Applied leave for emp ${leave.employeeId} (${leave.daysCount} days)`, userRole);
+      this.saveToStorage(this.state);
+      return newLeave;
+    }
   }
 
   public static updateLeaveStatus(
     id: string,
-    status: 'APPROVED' | 'REJECTED',
+    status: 'APPROVED' | 'PENDING' | 'REJECTED',
     approvedBy: string,
     userRole: string = 'Admin'
   ): void {
@@ -711,6 +848,54 @@ export class DatabaseService {
       this.logAudit('LEAVE_STATUS', `Leave ${id} set to ${status}`, userRole);
       this.saveToStorage(this.state);
     }
+  }
+
+  public static deleteLeave(id: string, userRole: string = 'Admin'): void {
+    this.state.employeeLeaves = this.state.employeeLeaves.filter(l => l.id !== id);
+    this.logAudit('DELETE_LEAVE', `Deleted leave application ${id}`, userRole);
+    this.saveToStorage(this.state);
+  }
+
+  // Incentives Management
+  public static getIncentives(month?: string): IncentiveRecord[] {
+    const list = this.state.incentives || [];
+    if (!month) return list;
+    return list.filter(i => i.payrollMonth === month);
+  }
+
+  public static saveIncentive(incentive: Partial<IncentiveRecord>, userRole: string = 'Admin'): IncentiveRecord {
+    if (!this.state.incentives) this.state.incentives = [];
+    if (incentive.id && this.state.incentives.some(i => i.id === incentive.id)) {
+      const idx = this.state.incentives.findIndex(i => i.id === incentive.id);
+      this.state.incentives[idx] = { ...this.state.incentives[idx], ...incentive } as IncentiveRecord;
+      this.logAudit('UPDATE_INCENTIVE', `Updated incentive for emp ${incentive.employeeId} (Rs. ${incentive.amount})`, userRole);
+      this.saveToStorage(this.state);
+      return this.state.incentives[idx];
+    } else {
+      const newInc: IncentiveRecord = {
+        id: incentive.id || `inc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        employeeId: incentive.employeeId || '',
+        payrollMonth: incentive.payrollMonth || new Date().toISOString().substring(0, 7),
+        type: incentive.type || 'PRODUCTION',
+        targetAmount: Number(incentive.targetAmount) || 0,
+        achievementAmount: Number(incentive.achievementAmount) || 0,
+        amount: Number(incentive.amount) || 0,
+        description: incentive.description || 'Target Incentive',
+        remarks: incentive.remarks || '',
+        date: incentive.date || new Date().toISOString().substring(0, 10)
+      };
+      this.state.incentives.push(newInc);
+      this.logAudit('ADD_INCENTIVE', `Recorded incentive for emp ${newInc.employeeId} of Rs. ${newInc.amount}`, userRole);
+      this.saveToStorage(this.state);
+      return newInc;
+    }
+  }
+
+  public static deleteIncentive(id: string, userRole: string = 'Admin'): void {
+    if (!this.state.incentives) this.state.incentives = [];
+    this.state.incentives = this.state.incentives.filter(i => i.id !== id);
+    this.logAudit('DELETE_INCENTIVE', `Removed incentive ${id}`, userRole);
+    this.saveToStorage(this.state);
   }
 
   // Allowance Deduction Rules

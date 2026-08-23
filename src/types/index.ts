@@ -200,8 +200,11 @@ export interface IncentiveRecord {
   employeeId: string;
   payrollMonth: string; // YYYY-MM
   type: IncentiveType;
+  targetAmount?: number;
+  achievementAmount?: number;
   amount: number;
   description: string;
+  remarks?: string;
   date: string;
 }
 

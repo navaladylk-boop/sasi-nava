@@ -6,6 +6,7 @@ import { EmployeeMasterView } from './components/employees/EmployeeMasterView';
 import { FingerprintDeviceView } from './components/attendance/FingerprintDeviceView';
 import { AttendanceView } from './components/attendance/AttendanceView';
 import { LeaveManagementView } from './components/leave/LeaveManagementView';
+import { IncentivesView } from './components/payroll/IncentivesView';
 import { PayrollGenerationView } from './components/payroll/PayrollGenerationView';
 import { SalarySheetView } from './components/payroll/SalarySheetView';
 import { PayslipQuadView } from './components/payroll/PayslipQuadView';
@@ -31,7 +32,8 @@ import {
   CompanySettings,
   AllowanceDeductionRule,
   PayrollPeriod,
-  AuditLog
+  AuditLog,
+  IncentiveRecord
 } from './types';
 
 export default function App() {
@@ -50,6 +52,7 @@ export default function App() {
   const [attendance, setAttendance] = useState<ProcessedAttendance[]>([]);
   const [leaves, setLeaves] = useState<EmployeeLeave[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
+  const [incentives, setIncentives] = useState<IncentiveRecord[]>([]);
   const [settings, setSettings] = useState<CompanySettings>(DatabaseService.getSettings());
   const [allowanceRules, setAllowanceRules] = useState<AllowanceDeductionRule[]>([]);
   const [payrollPeriod, setPayrollPeriod] = useState<PayrollPeriod | undefined>(undefined);
@@ -66,6 +69,7 @@ export default function App() {
     setAttendance(DatabaseService.getProcessedAttendance());
     setLeaves(DatabaseService.getLeaves());
     setLeaveTypes(DatabaseService.getLeaveTypes());
+    setIncentives(DatabaseService.getIncentives());
     const currentSettings = DatabaseService.getSettings();
     setSettings(currentSettings);
     setCurrentLanguage(currentSettings.defaultLanguage || 'en');
@@ -135,9 +139,21 @@ export default function App() {
   };
 
   // Handler: Update Leave Status
-  const handleUpdateLeaveStatus = (id: string, status: 'APPROVED' | 'REJECTED', approver: string) => {
+  const handleUpdateLeaveStatus = (id: string, status: 'APPROVED' | 'PENDING' | 'REJECTED', approver: string) => {
     DatabaseService.updateLeaveStatus(id, status, approver, currentUserRole);
     setLeaves(DatabaseService.getLeaves());
+  };
+
+  // Handler: Save Incentive
+  const handleSaveIncentive = (incentive: Partial<IncentiveRecord>) => {
+    DatabaseService.saveIncentive(incentive, currentUserRole);
+    setIncentives(DatabaseService.getIncentives());
+  };
+
+  // Handler: Delete Incentive
+  const handleDeleteIncentive = (id: string) => {
+    DatabaseService.deleteIncentive(id, currentUserRole);
+    setIncentives(DatabaseService.getIncentives());
   };
 
   // Handler: Save Allowance Rule
@@ -156,6 +172,36 @@ export default function App() {
   const handleSaveSettings = (newSettings: CompanySettings) => {
     DatabaseService.saveSettings(newSettings, currentUserRole);
     setSettings(newSettings);
+  };
+
+  // Handler: Save Department
+  const handleSaveDepartment = (dept: Partial<Department>) => {
+    DatabaseService.saveDepartment(dept, currentUserRole);
+    setDepartments(DatabaseService.getDepartments());
+  };
+
+  // Handler: Delete Department
+  const handleDeleteDepartment = (id: string): { success: boolean; message?: string } => {
+    const res = DatabaseService.deleteDepartment(id, currentUserRole);
+    if (res.success) {
+      setDepartments(DatabaseService.getDepartments());
+    }
+    return res;
+  };
+
+  // Handler: Save Designation
+  const handleSaveDesignation = (desig: Partial<Designation>) => {
+    DatabaseService.saveDesignation(desig, currentUserRole);
+    setDesignations(DatabaseService.getDesignations());
+  };
+
+  // Handler: Delete Designation
+  const handleDeleteDesignation = (id: string): { success: boolean; message?: string } => {
+    const res = DatabaseService.deleteDesignation(id, currentUserRole);
+    if (res.success) {
+      setDesignations(DatabaseService.getDesignations());
+    }
+    return res;
   };
 
   return (
@@ -238,6 +284,18 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'incentives' && (
+          <IncentivesView
+            language={currentLanguage}
+            currentMonth={currentMonth}
+            onMonthChange={setCurrentMonth}
+            employees={employees}
+            incentives={incentives}
+            onSaveIncentive={handleSaveIncentive}
+            onDeleteIncentive={handleDeleteIncentive}
+          />
+        )}
+
         {activeTab === 'payroll' && (
           <PayrollGenerationView
             language={currentLanguage}
@@ -315,6 +373,12 @@ export default function App() {
             devices={devices}
             rawPunches={rawPunches}
             employees={employees}
+            departments={departments}
+            designations={designations}
+            onSaveDepartment={handleSaveDepartment}
+            onDeleteDepartment={handleDeleteDepartment}
+            onSaveDesignation={handleSaveDesignation}
+            onDeleteDesignation={handleDeleteDesignation}
             onSaveDevice={handleSaveDevice}
             onPunchesDownloaded={handlePunchesDownloaded}
             onUpdateEmployee={handleSaveEmployee}

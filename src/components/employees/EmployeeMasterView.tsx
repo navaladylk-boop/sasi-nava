@@ -69,6 +69,8 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
     });
   }, [employees, searchTerm, selectedDept, selectedStatus]);
 
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string>('');
+
   const handleOpenAddModal = () => {
     setEditingEmployee({
       employeeCode: `EMP00${employees.length + 1}`,
@@ -87,9 +89,9 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
       employmentStatus: 'PERMANENT',
       epfNumber: `${1040 + employees.length + 1}`,
       etfNumber: `${1040 + employees.length + 1}`,
-      basicSalary: 35000,
+      basicSalary: 30000,
       fixedAllowance: 5000,
-      otherAllowance: 2000,
+      otherAllowance: 0,
       bankName: 'Commercial Bank of Ceylon',
       bankAccountNumber: '',
       branch: 'Colombo (001)',
@@ -113,13 +115,43 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
   const handleSaveModal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEmployee) return;
-    if (!editingEmployee.fullName || !editingEmployee.employeeCode) {
-      alert('Please fill in Employee Name and Employee Code.');
+
+    const code = editingEmployee.employeeCode?.trim();
+    const name = editingEmployee.fullName?.trim();
+
+    if (!code) {
+      alert('Please enter an Employee ID / Code.');
+      setActiveModalTab('general');
       return;
     }
-    onSaveEmployee(editingEmployee);
+
+    if (!name) {
+      alert('Please enter the Employee Full Name.');
+      setActiveModalTab('general');
+      return;
+    }
+
+    const payload: Partial<Employee> = {
+      ...editingEmployee,
+      employeeCode: code,
+      fullName: name,
+      basicSalary: Number(editingEmployee.basicSalary) || 0,
+      fixedAllowance: Number(editingEmployee.fixedAllowance) || 0,
+      otherAllowance: Number(editingEmployee.otherAllowance) || 0,
+      workingDaysPerMonth: Number(editingEmployee.workingDaysPerMonth) || 25,
+      normalWorkingHours: Number(editingEmployee.normalWorkingHours) || 8,
+      epfNumber: editingEmployee.epfNumber || code,
+      fingerprintUserId: editingEmployee.fingerprintUserId || code,
+      departmentId: editingEmployee.departmentId || departments[0]?.id || '',
+      designationId: editingEmployee.designationId || designations[0]?.id || '',
+      isActive: editingEmployee.isActive !== false
+    };
+
+    onSaveEmployee(payload);
     setIsModalOpen(false);
     setEditingEmployee(null);
+    setSaveSuccessMsg(`Employee "${name}" (${code}) saved successfully.`);
+    setTimeout(() => setSaveSuccessMsg(''), 4000);
   };
 
   const handlePrintList = () => {
@@ -171,6 +203,13 @@ export const EmployeeMasterView: React.FC<EmployeeMasterViewProps> = ({
           </button>
         </div>
       </div>
+
+      {saveSuccessMsg && (
+        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-lg text-xs font-semibold shadow-xs animate-fade-in">
+          <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+          {saveSuccessMsg}
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="bg-white border border-[#d1d5db] rounded-xl p-3.5 flex flex-wrap items-center gap-3 no-print shadow-xs">

@@ -12,7 +12,8 @@ import {
   FileBarChart,
   Settings,
   Database,
-  Sliders
+  Sliders,
+  Award
 } from 'lucide-react';
 import { Language } from '../../types';
 import { translations } from '../../i18n/translations';
@@ -23,6 +24,7 @@ export type ActiveTab =
   | 'attendance'
   | 'devices'
   | 'leave'
+  | 'incentives'
   | 'payroll'
   | 'salary-sheet'
   | 'payslips'
@@ -51,6 +53,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     { id: 'attendance', label: t.attendance, icon: CalendarCheck },
     { id: 'devices', label: t.fingerprintMachine, icon: Fingerprint },
     { id: 'leave', label: t.leave, icon: CalendarOff },
+    { id: 'incentives', label: 'Incentives', icon: Award },
     { id: 'payroll', label: t.payroll, icon: Calculator },
     { id: 'salary-sheet', label: t.salarySheet, icon: TableProperties },
     { id: 'payslips', label: t.payslips, icon: Printer },
