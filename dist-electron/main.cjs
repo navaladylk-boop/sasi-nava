@@ -465,6 +465,196 @@ var HikvisionISAPIClient = class {
 `);
     return allEvents;
   }
+  /**
+   * Retrieves registered user / person records from Hikvision terminal using ISAPI.
+   * This retrieves user metadata (employeeNo, name, userType, cardNo) without downloading biometric templates.
+   */
+  async getUserRecords() {
+    console.log(`
+=================== HIKVISION USER SEARCH QUERY START ===================`);
+    console.log(`[Hikvision User Import] Target Device: ${this.config.ipAddress}:${this.config.port}`);
+    console.log(`[Hikvision User Import] Initiating ISAPI Person / User Retrieval...`);
+    const usersMap = /* @__PURE__ */ new Map();
+    const searchID = `lankahr-usr-${Date.now()}`;
+    const maxResults = 30;
+    let position = 0;
+    let hasMore = true;
+    let jsonSuccess = false;
+    let batchIndex = 0;
+    let isUnsupported = false;
+    while (hasMore) {
+      batchIndex++;
+      const jsonPayload = JSON.stringify({
+        UserInfoSearchCond: {
+          searchID,
+          searchResultPosition: position,
+          maxResults
+        }
+      });
+      console.log(`[Hikvision User Import] JSON Batch #${batchIndex}: searchResultPosition=${position}, maxResults=${maxResults}`);
+      try {
+        const res = await this.executeWithAuth("POST", "/ISAPI/AccessControl/UserInfo/Search?format=json", jsonPayload);
+        const dataStr = res.data.trim();
+        if (res.statusCode === 404 || dataStr.includes("notSupport") || dataStr.includes("badParameters")) {
+          console.warn(`[Hikvision User Import] JSON endpoint returned status ${res.statusCode} or unsupported response.`);
+          break;
+        }
+        let parsed;
+        try {
+          parsed = JSON.parse(dataStr);
+        } catch {
+          console.warn(`[Hikvision User Import] Failed to parse JSON response on batch #${batchIndex}.`);
+          break;
+        }
+        const searchObj = parsed.UserInfoSearch || parsed;
+        const matches = searchObj.UserInfo || searchObj.userInfo || [];
+        const userList = Array.isArray(matches) ? matches : [matches];
+        const totalMatches = searchObj.totalMatches || searchObj.numOfMatches;
+        console.log(`[Hikvision User Import] JSON Batch #${batchIndex}: Received ${userList.length} user records (Total reported: ${totalMatches || "unknown"}).`);
+        if (userList.length > 0) {
+          jsonSuccess = true;
+          userList.forEach((u) => {
+            if (!u) return;
+            const empNo = String(u.employeeNo || u.employeeNoString || u.userNo || u.id || "").trim();
+            if (empNo) {
+              const name = String(u.name || "").trim();
+              const userType = String(u.userType || "normal");
+              const gender = String(u.gender || "");
+              const cardNo = u.cardNo ? String(u.cardNo).trim() : Array.isArray(u.cards) && u.cards[0] ? String(u.cards[0]).trim() : void 0;
+              const numOfCard = Number(u.numOfCard || 0);
+              const numOfFP = Number(u.numOfFP || 0);
+              const numOfFace = Number(u.numOfFace || 0);
+              const userVerifyMode = u.userVerifyMode ? String(u.userVerifyMode) : void 0;
+              const doorRight = u.doorRight ? String(u.doorRight) : void 0;
+              const validBegin = u.Valid?.beginTime;
+              const validEnd = u.Valid?.endTime;
+              if (!usersMap.has(empNo)) {
+                usersMap.set(empNo, {
+                  employeeNo: empNo,
+                  name: name || void 0,
+                  userType,
+                  gender: gender || void 0,
+                  cardNo,
+                  numOfCard,
+                  numOfFP,
+                  numOfFace,
+                  userVerifyMode,
+                  doorRight,
+                  validBegin,
+                  validEnd
+                });
+              }
+            }
+          });
+          if (userList.length < maxResults || totalMatches && position + userList.length >= totalMatches) {
+            hasMore = false;
+          } else {
+            position += userList.length;
+          }
+        } else {
+          hasMore = false;
+        }
+      } catch (err) {
+        console.error(`[Hikvision User Import] JSON Query Error: ${err?.message}`);
+        if (err?.message?.includes("404") || err?.message?.includes("notSupport")) {
+          isUnsupported = true;
+        }
+        break;
+      }
+    }
+    if (jsonSuccess && usersMap.size > 0) {
+      const result = Array.from(usersMap.values());
+      console.log(`[Hikvision User Import] Successfully retrieved ${result.length} users via ISAPI JSON.`);
+      console.log(`=================== HIKVISION USER SEARCH QUERY END ===================
+`);
+      return result;
+    }
+    console.log(`[Hikvision User Import] Attempting XML ISAPI UserInfo Fallback Query...`);
+    position = 0;
+    hasMore = true;
+    batchIndex = 0;
+    while (hasMore) {
+      batchIndex++;
+      const xmlPayload = `<?xml version="1.0" encoding="utf-8"?>
+<UserInfoSearchCond xmlns="http://www.isapi.org/ver20/XMLSchema" version="2.0">
+  <searchID>${searchID}</searchID>
+  <searchResultPosition>${position}</searchResultPosition>
+  <maxResults>${maxResults}</maxResults>
+</UserInfoSearchCond>`;
+      console.log(`[Hikvision User Import] XML Batch #${batchIndex}: searchResultPosition=${position}, maxResults=${maxResults}`);
+      try {
+        const resXml = await this.executeWithAuth("POST", "/ISAPI/AccessControl/UserInfo/Search", xmlPayload);
+        const xml = resXml.data;
+        if (resXml.statusCode === 404 || xml.includes("notSupport")) {
+          console.warn(`[Hikvision User Import] XML endpoint returned 404 or notSupport.`);
+          isUnsupported = true;
+          break;
+        }
+        const userBlocks = xml.match(/<UserInfo>[\s\S]*?<\/UserInfo>/gi) || [];
+        console.log(`[Hikvision User Import] XML Batch #${batchIndex}: ${userBlocks.length} UserInfo blocks parsed.`);
+        if (userBlocks.length === 0) {
+          hasMore = false;
+          break;
+        }
+        const getTag = (block, tag) => {
+          const match = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
+          return match ? match[1].trim() : "";
+        };
+        userBlocks.forEach((block) => {
+          const empNo = getTag(block, "employeeNo") || getTag(block, "employeeNoString") || getTag(block, "userNo");
+          if (empNo) {
+            const name = getTag(block, "name");
+            const userType = getTag(block, "userType") || "normal";
+            const gender = getTag(block, "gender");
+            const cardNo = getTag(block, "cardNo");
+            const numOfCard = parseInt(getTag(block, "numOfCard") || "0", 10);
+            const numOfFP = parseInt(getTag(block, "numOfFP") || "0", 10);
+            const numOfFace = parseInt(getTag(block, "numOfFace") || "0", 10);
+            if (!usersMap.has(empNo)) {
+              usersMap.set(empNo, {
+                employeeNo: empNo.trim(),
+                name: name ? name.trim() : void 0,
+                userType,
+                gender: gender ? gender.trim() : void 0,
+                cardNo: cardNo ? cardNo.trim() : void 0,
+                numOfCard,
+                numOfFP,
+                numOfFace
+              });
+            }
+          }
+        });
+        if (userBlocks.length < maxResults) {
+          hasMore = false;
+        } else {
+          position += userBlocks.length;
+        }
+      } catch (err) {
+        console.error(`[Hikvision User Import] XML Query Error: ${err?.message}`);
+        if (err?.message?.includes("404") || err?.message?.includes("notSupport")) {
+          isUnsupported = true;
+        }
+        hasMore = false;
+      }
+    }
+    if (usersMap.size > 0) {
+      const result = Array.from(usersMap.values());
+      console.log(`[Hikvision User Import] Successfully retrieved ${result.length} users via ISAPI XML.`);
+      console.log(`=================== HIKVISION USER SEARCH QUERY END ===================
+`);
+      return result;
+    }
+    if (isUnsupported || usersMap.size === 0) {
+      console.warn(`[Hikvision User Import] Device does not support UserInfo ISAPI Search or returned no users.`);
+      if (isUnsupported) {
+        throw new Error("Hikvision user synchronization is not supported by this device/API.");
+      }
+    }
+    console.log(`[Hikvision User Import] No registered user records found on terminal.`);
+    console.log(`=================== HIKVISION USER SEARCH QUERY END ===================
+`);
+    return [];
+  }
 };
 
 // electron/sqliteDb.ts
@@ -1413,6 +1603,29 @@ import_electron2.ipcMain.handle("device:hikvision-download", async (event, confi
       events: [],
       count: 0,
       message: `Failed to download attendance logs: ${err.message}`
+    };
+  }
+});
+import_electron2.ipcMain.handle("device:hikvision-search-users", async (event, config) => {
+  try {
+    console.log(`[Electron Hikvision] Searching users on IP: ${config.ipAddress}:${config.port}`);
+    const client = new HikvisionISAPIClient(config);
+    const users = await client.getUserRecords();
+    return {
+      success: true,
+      users,
+      count: users.length,
+      message: `Retrieved ${users.length} registered user records from Hikvision terminal at ${config.ipAddress}:${config.port}`
+    };
+  } catch (err) {
+    console.error(`[Electron Hikvision] Search users failed: ${err.message}`);
+    const isUnsupported = err.message?.includes("not supported") || err.message?.includes("404");
+    return {
+      success: false,
+      users: [],
+      count: 0,
+      isUnsupported,
+      message: isUnsupported ? "Hikvision user synchronization is not supported by this device/API." : `Failed to retrieve Hikvision users: ${err.message}`
     };
   }
 });
