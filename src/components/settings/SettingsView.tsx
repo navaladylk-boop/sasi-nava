@@ -54,6 +54,12 @@ interface SettingsViewProps {
   onSaveDevice?: (device: Partial<FingerprintDevice>) => void;
   onPunchesDownloaded?: (punches: RawAttendancePunch[]) => void;
   onUpdateEmployee?: (emp: Partial<Employee>) => void;
+  onBatchImportEmployees?: (items: {
+    hikvisionPersonId: string;
+    name?: string;
+    action: 'CREATE_NEW' | 'UPDATE_MAPPING' | 'SKIP';
+    targetEmployeeId?: string;
+  }[]) => Promise<{ createdCount: number; updatedCount: number; relinkedPunchesCount: number }>;
   onBack?: () => void;
 }
 
@@ -80,6 +86,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onSaveDevice = () => {},
   onPunchesDownloaded = () => {},
   onUpdateEmployee = () => {},
+  onBatchImportEmployees,
   onBack
 }) => {
   const t = translations[language];
@@ -195,6 +202,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           onSaveDevice={onSaveDevice}
           onPunchesDownloaded={onPunchesDownloaded}
           onUpdateEmployee={onUpdateEmployee}
+          onBatchImportEmployees={onBatchImportEmployees}
         />
       ) : activeSubTab === 'org' ? (
         <OrgStructureSettings

@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readFile: (filePath) => ipcRenderer.invoke('fs:read-file', filePath),
   testHikvisionDevice: (config) => ipcRenderer.invoke('device:hikvision-test', config),
   downloadHikvisionAttendance: (config, startDate, endDate) => ipcRenderer.invoke('device:hikvision-download', config, startDate, endDate),
+  searchHikvisionUsers: (config) => ipcRenderer.invoke('device:hikvision-search-users', config),
   onHikvisionProgress: (callback) => {
     const handler = (_event, data) => callback(data);
     ipcRenderer.on('hikvision:download-progress', handler);

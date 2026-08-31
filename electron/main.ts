@@ -386,4 +386,30 @@ ipcMain.handle('device:hikvision-download', async (event, config: HikvisionConfi
   }
 });
 
+ipcMain.handle('device:hikvision-search-users', async (event, config: HikvisionConfig) => {
+  try {
+    console.log(`[Electron Hikvision] Searching users on IP: ${config.ipAddress}:${config.port}`);
+    const client = new HikvisionISAPIClient(config);
+    const users = await client.getUserRecords();
+    return {
+      success: true,
+      users,
+      count: users.length,
+      message: `Retrieved ${users.length} registered user records from Hikvision terminal at ${config.ipAddress}:${config.port}`
+    };
+  } catch (err: any) {
+    console.error(`[Electron Hikvision] Search users failed: ${err.message}`);
+    const isUnsupported = err.message?.includes('not supported') || err.message?.includes('404');
+    return {
+      success: false,
+      users: [],
+      count: 0,
+      isUnsupported,
+      message: isUnsupported
+        ? 'Hikvision user synchronization is not supported by this device/API.'
+        : `Failed to retrieve Hikvision users: ${err.message}`
+    };
+  }
+});
+
 export { SqliteDatabaseManager };

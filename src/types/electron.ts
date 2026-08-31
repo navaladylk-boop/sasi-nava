@@ -36,6 +36,30 @@ export interface HikvisionDownloadResponse {
   message: string;
 }
 
+export interface HikvisionUserRecord {
+  employeeNo: string;
+  name?: string;
+  userType?: string;
+  gender?: string;
+  cardNo?: string;
+  cards?: string[];
+  numOfCard?: number;
+  numOfFP?: number;
+  numOfFace?: number;
+  userVerifyMode?: string;
+  doorRight?: string;
+  validBegin?: string;
+  validEnd?: string;
+}
+
+export interface HikvisionUserSearchResponse {
+  success: boolean;
+  users: HikvisionUserRecord[];
+  count: number;
+  message: string;
+  isUnsupported?: boolean;
+}
+
 export interface ElectronAPI {
   isDesktop?: boolean;
   getVersion: () => Promise<string>;
@@ -54,6 +78,7 @@ export interface ElectronAPI {
   readFile: (filePath: string) => Promise<{ success: boolean; data?: string; error?: string }>;
   testHikvisionDevice: (config: HikvisionDeviceConfig) => Promise<HikvisionDeviceTestResult>;
   downloadHikvisionAttendance: (config: HikvisionDeviceConfig, startDate?: string, endDate?: string) => Promise<HikvisionDownloadResponse>;
+  searchHikvisionUsers: (config: HikvisionDeviceConfig) => Promise<HikvisionUserSearchResponse>;
   onHikvisionProgress?: (callback: (progress: { totalFetched: number; currentBatchSize: number }) => void) => () => void;
 }
 

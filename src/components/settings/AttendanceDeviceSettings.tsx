@@ -18,8 +18,14 @@ import {
 import { FingerprintDevice, RawAttendancePunch, Employee, Language } from '../../types';
 import { BackButton } from '../common/NavigationButtons';
 import { translations } from '../../i18n/translations';
-import { HikvisionService, HikvisionSyncReport } from '../../services/hikvisionService';
+import {
+  HikvisionService,
+  HikvisionSyncReport,
+  HikvisionUserImportPreviewItem,
+  HikvisionUserSyncAnalysis
+} from '../../services/hikvisionService';
 import { HikvisionDeviceTestResult } from '../../types/electron';
+import { DatabaseService } from '../../services/db';
 
 interface AttendanceDeviceSettingsProps {
   language: Language;
@@ -29,6 +35,12 @@ interface AttendanceDeviceSettingsProps {
   onSaveDevice: (device: Partial<FingerprintDevice>) => void;
   onPunchesDownloaded: (punches: RawAttendancePunch[]) => void;
   onUpdateEmployee: (emp: Partial<Employee>) => void;
+  onBatchImportEmployees?: (items: {
+    hikvisionPersonId: string;
+    name?: string;
+    action: 'CREATE_NEW' | 'UPDATE_MAPPING' | 'SKIP';
+    targetEmployeeId?: string;
+  }[]) => Promise<{ createdCount: number; updatedCount: number; relinkedPunchesCount: number }>;
   onBack?: () => void;
 }
 
@@ -40,6 +52,7 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
   onSaveDevice,
   onPunchesDownloaded,
   onUpdateEmployee,
+  onBatchImportEmployees,
   onBack
 }) => {
   const t = translations[language];
@@ -130,6 +143,20 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
   // Mapping state
   const [selectedUnmappedId, setSelectedUnmappedId] = useState<string>('');
   const [selectedTargetEmpId, setSelectedTargetEmpId] = useState<string>('');
+
+  // Hikvision User Import & Synchronization State
+  const [isFetchingUsers, setIsFetchingUsers] = useState<boolean>(false);
+  const [fetchUsersError, setFetchUsersError] = useState<string | null>(null);
+  const [userSyncAnalysis, setUserSyncAnalysis] = useState<HikvisionUserSyncAnalysis | null>(null);
+  const [previewItems, setPreviewItems] = useState<HikvisionUserImportPreviewItem[]>([]);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+  const [importFeedback, setImportFeedback] = useState<{
+    success: boolean;
+    message: string;
+    createdCount: number;
+    updatedCount: number;
+    relinkedCount: number;
+  } | null>(null);
 
   useEffect(() => {
     const existing = devices.find(d => d.brand === 'Hikvision');
@@ -258,6 +285,136 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
     alert(`Successfully mapped Hikvision Person ID "${selectedUnmappedId}" to ${targetEmp.employeeCode} (${targetEmp.fullName}).`);
     setSelectedUnmappedId('');
     setSelectedTargetEmpId('');
+  };
+
+  // Fetch Users / Person Records from Hikvision Terminal
+  const handleFetchHikvisionUsers = async () => {
+    setIsFetchingUsers(true);
+    setFetchUsersError(null);
+    setImportFeedback(null);
+
+    try {
+      const res = await HikvisionService.fetchHikvisionUsers(deviceForm);
+      if (!res.success) {
+        setFetchUsersError(res.message || 'Failed to fetch users from Hikvision terminal.');
+        setUserSyncAnalysis(null);
+        setPreviewItems([]);
+        return;
+      }
+
+      if (!res.users || res.users.length === 0) {
+        setFetchUsersError('No registered users found inside the Hikvision terminal.');
+        setUserSyncAnalysis(null);
+        setPreviewItems([]);
+        return;
+      }
+
+      const analysis = HikvisionService.analyzeHikvisionUsers(res.users, employees);
+      setUserSyncAnalysis(analysis);
+      setPreviewItems(analysis.previewList);
+    } catch (err: any) {
+      setFetchUsersError(err.message || 'An unexpected error occurred while communicating with Hikvision device.');
+      setUserSyncAnalysis(null);
+      setPreviewItems([]);
+    } finally {
+      setIsFetchingUsers(false);
+    }
+  };
+
+  const handleToggleSelectPreviewItem = (index: number) => {
+    setPreviewItems(prev =>
+      prev.map((item, idx) => (idx === index ? { ...item, selected: !item.selected } : item))
+    );
+  };
+
+  const handleToggleSelectAll = (select: boolean) => {
+    setPreviewItems(prev =>
+      prev.map(item => ({
+        ...item,
+        selected: item.suggestedAction === 'ALREADY_MAPPED' ? false : select
+      }))
+    );
+  };
+
+  const handleChangePreviewAction = (
+    index: number,
+    action: 'CREATE_NEW' | 'UPDATE_MAPPING' | 'ALREADY_MAPPED'
+  ) => {
+    setPreviewItems(prev =>
+      prev.map((item, idx) => (idx === index ? { ...item, suggestedAction: action } : item))
+    );
+  };
+
+  const handleChangePreviewTargetEmp = (index: number, targetEmpId: string) => {
+    setPreviewItems(prev =>
+      prev.map((item, idx) => {
+        if (idx === index) {
+          const emp = employees.find(e => e.id === targetEmpId);
+          return {
+            ...item,
+            targetEmployeeId: targetEmpId,
+            matchedEmployee: emp,
+            suggestedAction: 'UPDATE_MAPPING'
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  // Commit Import to Database
+  const handleExecuteImport = async (selectedOnly: boolean) => {
+    const itemsToProcess = previewItems.filter(item => {
+      if (item.suggestedAction === 'ALREADY_MAPPED') return false;
+      return selectedOnly ? item.selected : true;
+    });
+
+    if (itemsToProcess.length === 0) {
+      alert('No pending users selected for import.');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportFeedback(null);
+
+    try {
+      const payload = itemsToProcess.map(item => ({
+        hikvisionPersonId: item.hikvisionPersonId,
+        name: item.name,
+        action: (item.suggestedAction === 'UPDATE_MAPPING' ? 'UPDATE_MAPPING' : 'CREATE_NEW') as 'CREATE_NEW' | 'UPDATE_MAPPING' | 'SKIP',
+        targetEmployeeId: item.targetEmployeeId
+      }));
+
+      let result: { createdCount: number; updatedCount: number; relinkedPunchesCount: number };
+
+      if (onBatchImportEmployees) {
+        result = await onBatchImportEmployees(payload);
+      } else {
+        result = await DatabaseService.importHikvisionUsers(payload);
+      }
+
+      setImportFeedback({
+        success: true,
+        message: `Successfully synchronized Hikvision users!\n• ${result.createdCount} new employee profile(s) created.\n• ${result.updatedCount} employee fingerprint mapping(s) updated.\n• ${result.relinkedPunchesCount} historical raw attendance punch(es) re-linked.`,
+        createdCount: result.createdCount,
+        updatedCount: result.updatedCount,
+        relinkedCount: result.relinkedPunchesCount
+      });
+
+      // Clear preview after successful import
+      setUserSyncAnalysis(null);
+      setPreviewItems([]);
+    } catch (err: any) {
+      setImportFeedback({
+        success: false,
+        message: `Failed to import Hikvision users: ${err.message || 'Database error'}`,
+        createdCount: 0,
+        updatedCount: 0,
+        relinkedCount: 0
+      });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   return (
@@ -500,7 +657,258 @@ export const AttendanceDeviceSettings: React.FC<AttendanceDeviceSettingsProps> =
         )}
       </div>
 
-      {/* 2. Attendance Download Section */}
+      {/* 2. Hikvision Employee / User Import & Synchronization Section */}
+      <div className="bg-white border border-[#d1d5db] rounded-xl p-5 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-[#e5e7eb] pb-3">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-[#005a9e]" />
+            <div>
+              <h2 className="text-sm font-bold text-[#111827]">Import Employees from Hikvision</h2>
+              <p className="text-[11px] text-[#64748b]">
+                Retrieve registered users/person records from the Hikvision terminal, match existing employees, and auto-link historical punches.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            id="import-hikvision-users-btn"
+            disabled={isFetchingUsers || isImporting}
+            onClick={handleFetchHikvisionUsers}
+            className="flex items-center gap-2 py-2 px-4 bg-[#005a9e] hover:bg-[#004880] text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetchingUsers ? 'animate-spin' : ''}`} />
+            {isFetchingUsers ? 'Connecting to Terminal...' : 'IMPORT EMPLOYEES FROM HIKVISION'}
+          </button>
+        </div>
+
+        {/* Error / Diagnostic Alert */}
+        {fetchUsersError && (
+          <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2.5 text-xs text-rose-900">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold">Sync Notice: </span>
+              {fetchUsersError}
+            </div>
+          </div>
+        )}
+
+        {/* Import Feedback Alert */}
+        {importFeedback && (
+          <div
+            className={`p-3.5 rounded-lg border flex items-start gap-2.5 text-xs ${
+              importFeedback.success
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}
+          >
+            {importFeedback.success ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            )}
+            <div className="whitespace-pre-line font-medium">
+              {importFeedback.message}
+            </div>
+          </div>
+        )}
+
+        {/* User Sync Preview & Analysis */}
+        {userSyncAnalysis && previewItems.length > 0 && (
+          <div className="space-y-4 pt-2">
+            {/* Metric Summary Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-[#f8fafc] p-3 rounded-lg border border-[#e2e8f0]">
+              <div>
+                <span className="text-[#64748b] block text-[10px] uppercase font-bold">Terminal Users</span>
+                <span className="font-mono font-bold text-[#005a9e] text-sm">
+                  {userSyncAnalysis.totalUsersFound}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#64748b] block text-[10px] uppercase font-bold">New Employees</span>
+                <span className="font-mono font-bold text-emerald-700 text-sm">
+                  {userSyncAnalysis.newUsersCount}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#64748b] block text-[10px] uppercase font-bold">Needs Mapping Update</span>
+                <span className="font-mono font-bold text-amber-700 text-sm">
+                  {userSyncAnalysis.existingUsersCount}
+                </span>
+              </div>
+              <div>
+                <span className="text-[#64748b] block text-[10px] uppercase font-bold">Already Mapped</span>
+                <span className="font-mono font-bold text-[#475569] text-sm">
+                  {userSyncAnalysis.alreadyMappedCount}
+                </span>
+              </div>
+            </div>
+
+            {/* Preview Table */}
+            <div className="border border-[#e2e8f0] rounded-lg overflow-hidden">
+              <div className="p-3 bg-[#f1f5f9] border-b border-[#e2e8f0] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="select-all-preview"
+                    checked={previewItems.some(i => i.selected)}
+                    onChange={e => handleToggleSelectAll(e.target.checked)}
+                    className="rounded border-[#cbd5e1] text-[#005a9e] focus:ring-[#005a9e] cursor-pointer"
+                  />
+                  <label htmlFor="select-all-preview" className="text-xs font-bold text-[#334155] cursor-pointer">
+                    Select All Pending ({previewItems.filter(i => i.suggestedAction !== 'ALREADY_MAPPED').length})
+                  </label>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-[#64748b]">
+                    Selected:{' '}
+                    <strong className="text-[#111827]">
+                      {previewItems.filter(i => i.selected && i.suggestedAction !== 'ALREADY_MAPPED').length}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto max-h-72 overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-[#f8fafc] text-[#475569] uppercase text-[10px] tracking-wider border-b border-[#e2e8f0]">
+                    <tr>
+                      <th className="py-2.5 px-3 w-10 text-center">Select</th>
+                      <th className="py-2.5 px-3">Person ID</th>
+                      <th className="py-2.5 px-3">Name on Terminal</th>
+                      <th className="py-2.5 px-3">Biometrics / Card</th>
+                      <th className="py-2.5 px-3">Detection / Match</th>
+                      <th className="py-2.5 px-3">Action to Perform</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#f1f5f9]">
+                    {previewItems.map((item, idx) => (
+                      <tr
+                        key={`${item.hikvisionPersonId}-${idx}`}
+                        className={`hover:bg-[#f8fafc] ${item.selected ? 'bg-blue-50/40' : ''}`}
+                      >
+                        <td className="py-2.5 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            disabled={item.suggestedAction === 'ALREADY_MAPPED'}
+                            checked={item.selected}
+                            onChange={() => handleToggleSelectPreviewItem(idx)}
+                            className="rounded border-[#cbd5e1] text-[#005a9e] focus:ring-[#005a9e] cursor-pointer disabled:opacity-30"
+                          />
+                        </td>
+                        <td className="py-2.5 px-3 font-mono font-bold text-[#005a9e]">
+                          {item.hikvisionPersonId}
+                        </td>
+                        <td className="py-2.5 px-3 font-medium text-[#111827]">
+                          {item.name || <span className="text-[#94a3b8] italic">No Name</span>}
+                        </td>
+                        <td className="py-2.5 px-3 text-[#64748b] text-[11px] font-mono">
+                          {item.cardNo ? `Card: ${item.cardNo} ` : ''}
+                          {item.numOfFP ? `${item.numOfFP} FP ` : ''}
+                          {item.numOfFace ? `${item.numOfFace} Face` : ''}
+                          {!item.cardNo && !item.numOfFP && !item.numOfFace && 'Registered'}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {item.suggestedAction === 'ALREADY_MAPPED' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3" />
+                              MAPPED: {item.matchedEmployee?.employeeCode} ({item.matchedEmployee?.fullName})
+                            </span>
+                          ) : item.matchedEmployee ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              <AlertCircle className="w-3 h-3" />
+                              MATCH: {item.matchedEmployee.employeeCode} ({item.matchedEmployee.fullName})
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              + NEW EMPLOYEE
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {item.suggestedAction === 'ALREADY_MAPPED' ? (
+                            <span className="text-[#64748b] text-[11px]">Synced (No Action Needed)</span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={item.suggestedAction}
+                                onChange={e =>
+                                  handleChangePreviewAction(
+                                    idx,
+                                    e.target.value as 'CREATE_NEW' | 'UPDATE_MAPPING' | 'ALREADY_MAPPED'
+                                  )
+                                }
+                                className="bg-white border border-[#cbd5e1] rounded px-2 py-1 text-xs text-[#111827] focus:border-[#005a9e] focus:outline-none"
+                              >
+                                <option value="CREATE_NEW">Create New Employee</option>
+                                <option value="UPDATE_MAPPING">Map to Existing Employee...</option>
+                              </select>
+
+                              {item.suggestedAction === 'UPDATE_MAPPING' && (
+                                <select
+                                  value={item.targetEmployeeId || item.matchedEmployee?.id || ''}
+                                  onChange={e => handleChangePreviewTargetEmp(idx, e.target.value)}
+                                  className="bg-white border border-[#cbd5e1] rounded px-2 py-1 text-xs text-[#111827] focus:border-[#005a9e] focus:outline-none max-w-[160px]"
+                                >
+                                  <option value="">-- Choose Employee --</option>
+                                  {employees.map(emp => (
+                                    <option key={emp.id} value={emp.id}>
+                                      {emp.employeeCode} - {emp.fullName}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Bottom Action Footer */}
+              <div className="p-3 bg-[#f8fafc] border-t border-[#e2e8f0] flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserSyncAnalysis(null);
+                    setPreviewItems([]);
+                  }}
+                  className="px-3 py-1.5 bg-white hover:bg-gray-100 text-[#475569] rounded font-medium border border-[#cbd5e1] text-xs cursor-pointer"
+                >
+                  Dismiss Preview
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isImporting || !previewItems.some(i => i.selected && i.suggestedAction !== 'ALREADY_MAPPED')}
+                    onClick={() => handleExecuteImport(true)}
+                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    {isImporting
+                      ? 'Importing...'
+                      : `IMPORT SELECTED (${previewItems.filter(i => i.selected && i.suggestedAction !== 'ALREADY_MAPPED').length})`}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isImporting || !previewItems.some(i => i.suggestedAction !== 'ALREADY_MAPPED')}
+                    onClick={() => handleExecuteImport(false)}
+                    className="px-4 py-2 bg-[#005a9e] hover:bg-[#004880] text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1.5"
+                  >
+                    <Users className="w-4 h-4" />
+                    {isImporting
+                      ? 'Importing...'
+                      : `IMPORT ALL (${previewItems.filter(i => i.suggestedAction !== 'ALREADY_MAPPED').length})`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 3. Attendance Download Section */}
       <div className="bg-white border border-[#d1d5db] rounded-xl p-5 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-[#e5e7eb] pb-3">
           <div className="flex items-center gap-2">

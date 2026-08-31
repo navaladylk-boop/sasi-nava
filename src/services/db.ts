@@ -561,6 +561,132 @@ export class DatabaseService {
     }
   }
 
+  /**
+   * Safe batch import / mapping of Hikvision users into LankaHR.
+   * Preserves all financial, statutory, bank, and leave records.
+   * Automatically re-links historical raw punches.
+   */
+  public static async importHikvisionUsers(
+    importItems: {
+      hikvisionPersonId: string;
+      name?: string;
+      action: 'CREATE_NEW' | 'UPDATE_MAPPING' | 'SKIP';
+      targetEmployeeId?: string;
+    }[],
+    userRole: string = 'Admin'
+  ): Promise<{ createdCount: number; updatedCount: number; relinkedPunchesCount: number }> {
+    if (!this.state.employees) this.state.employees = [];
+
+    const normalizeId = (idStr?: string | number): string => {
+      if (idStr === undefined || idStr === null) return '';
+      return String(idStr).trim().toLowerCase().replace(/^emp-/, '').replace(/^0+/, '');
+    };
+
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    for (const item of importItems) {
+      if (item.action === 'SKIP') continue;
+
+      const personId = String(item.hikvisionPersonId).trim();
+      if (!personId) continue;
+
+      const normPersonId = normalizeId(personId);
+
+      if (item.action === 'UPDATE_MAPPING') {
+        let targetEmp: Employee | undefined;
+        if (item.targetEmployeeId) {
+          targetEmp = this.state.employees.find(e => e.id === item.targetEmployeeId);
+        }
+        if (!targetEmp) {
+          targetEmp = this.state.employees.find(
+            e => normalizeId(e.fingerprintUserId) === normPersonId || normalizeId(e.employeeCode) === normPersonId
+          );
+        }
+
+        if (targetEmp) {
+          // Update mapping ONLY - Preserve all salary, allowances, EPF, ETF, bank, leave & payroll history
+          targetEmp.fingerprintUserId = personId;
+          if (item.name && item.name.trim() && (!targetEmp.fullName || targetEmp.fullName.startsWith('Employee '))) {
+            targetEmp.fullName = item.name.trim();
+          }
+          updatedCount++;
+        }
+      } else if (item.action === 'CREATE_NEW') {
+        // Prevent duplicate creation if an employee with this fingerprint ID or code already exists
+        const existingEmp = this.state.employees.find(
+          e => e.fingerprintUserId === personId ||
+               normalizeId(e.fingerprintUserId) === normPersonId ||
+               e.employeeCode.toLowerCase() === `emp${personId.padStart(3, '0')}`.toLowerCase() ||
+               e.employeeCode.toLowerCase() === personId.toLowerCase()
+        );
+
+        if (existingEmp) {
+          existingEmp.fingerprintUserId = personId;
+          if (item.name && item.name.trim() && (!existingEmp.fullName || existingEmp.fullName.startsWith('Employee '))) {
+            existingEmp.fullName = item.name.trim();
+          }
+          updatedCount++;
+        } else {
+          const formattedCode = personId.toUpperCase().startsWith('EMP')
+            ? personId.toUpperCase()
+            : `EMP${personId.padStart(3, '0')}`;
+
+          const newEmployee: Employee = {
+            id: `emp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            employeeCode: formattedCode,
+            fullName: item.name && item.name.trim() ? item.name.trim() : `Employee ${personId}`,
+            nameSinhala: '',
+            nameTamil: '',
+            nic: '',
+            dob: '1995-01-01',
+            gender: 'MALE',
+            address: '',
+            telephone: '',
+            email: '',
+            departmentId: this.state.departments[0]?.id || 'dept-01',
+            designationId: this.state.designations[0]?.id || 'des-01',
+            joinDate: new Date().toISOString().slice(0, 10),
+            employmentStatus: 'PERMANENT',
+            epfNumber: personId,
+            etfNumber: '',
+            epfEnabled: true,
+            etfEnabled: true,
+            basicSalary: 30000,
+            fixedAllowance: 5000,
+            otherAllowance: 0,
+            bankName: 'Bank of Ceylon',
+            bankAccountNumber: '',
+            branch: 'Head Office',
+            payrollCategoryId: this.state.payrollCategories[0]?.id || 'cat-01',
+            workingDaysPerMonth: this.state.companySettings.defaultWorkingDaysPerMonth || 25,
+            normalWorkingHours: this.state.companySettings.normalWorkingHoursPerDay || 8,
+            otRateType: '1.5X_STANDARD',
+            fingerprintUserId: personId,
+            isActive: true
+          };
+
+          this.state.employees.push(newEmployee);
+          createdCount++;
+        }
+      }
+    }
+
+    // Automatically re-link all unmapped historical raw attendance punches
+    const relinkedPunchesCount = this.autoRelinkRawPunches();
+
+    await this.saveToStorage(this.state);
+    this.logAudit(
+      'IMPORT_HIKVISION_USERS',
+      `Synchronized Hikvision users (Created: ${createdCount}, Updated: ${updatedCount}, Re-linked punches: ${relinkedPunchesCount})`,
+      userRole
+    );
+
+    console.log(`[Hikvision User Sync] Complete: Created ${createdCount}, Updated mappings ${updatedCount}, Re-linked punches ${relinkedPunchesCount}`);
+
+    return { createdCount, updatedCount, relinkedPunchesCount };
+  }
+
   // Departments & Designations CRUD
   public static getDepartments(): Department[] {
     return this.state.departments || defaultDepartments;

@@ -1,5 +1,11 @@
 import { FingerprintDevice, RawAttendancePunch, Employee } from '../types';
-import { HikvisionDeviceConfig, HikvisionDeviceTestResult, HikvisionDownloadResponse } from '../types/electron';
+import {
+  HikvisionDeviceConfig,
+  HikvisionDeviceTestResult,
+  HikvisionDownloadResponse,
+  HikvisionUserRecord,
+  HikvisionUserSearchResponse
+} from '../types/electron';
 
 export interface HikvisionSyncReport {
   success: boolean;
@@ -16,6 +22,30 @@ export interface HikvisionSyncReport {
     deviceName?: string;
     deviceTime?: string;
   };
+}
+
+export interface HikvisionUserImportPreviewItem {
+  hikvisionPersonId: string;
+  name?: string;
+  userType?: string;
+  gender?: string;
+  cardNo?: string;
+  numOfFP?: number;
+  numOfFace?: number;
+  matchedEmployee?: Employee;
+  matchType: 'EXACT_FINGERPRINT' | 'CODE_MATCH' | 'NORMALIZED_MATCH' | 'NONE';
+  suggestedAction: 'CREATE_NEW' | 'UPDATE_MAPPING' | 'ALREADY_MAPPED';
+  selected: boolean;
+  targetEmployeeId?: string;
+}
+
+export interface HikvisionUserSyncAnalysis {
+  totalUsersFound: number;
+  newUsersCount: number;
+  existingUsersCount: number;
+  alreadyMappedCount: number;
+  unmappedCount: number;
+  previewList: HikvisionUserImportPreviewItem[];
 }
 
 export function normalizeEmployeeId(idStr?: string | number): string {
@@ -317,6 +347,180 @@ Unmapped employee events: ${unmappedCount.toLocaleString()}`;
       duplicateRecordsCount: duplicateCount,
       unmappedCount,
       punches: newOrUpdatedPunches
+    };
+  }
+
+  /**
+   * Fetch registered users / person records from Hikvision terminal.
+   */
+  public static async fetchHikvisionUsers(device: FingerprintDevice): Promise<HikvisionUserSearchResponse> {
+    const config: HikvisionDeviceConfig = {
+      ipAddress: device.ipAddress.trim(),
+      port: Number(device.port) || 80,
+      username: device.username || 'admin',
+      password: device.password || '',
+      timeoutMs: 10000,
+      useHttps: device.port === 443
+    };
+
+    if (typeof window !== 'undefined' && window.electronAPI?.searchHikvisionUsers) {
+      try {
+        const res = await window.electronAPI.searchHikvisionUsers(config);
+        return res;
+      } catch (err: any) {
+        const isUnsupported = err.message?.includes('not supported') || err.message?.includes('404');
+        return {
+          success: false,
+          users: [],
+          count: 0,
+          isUnsupported,
+          message: isUnsupported
+            ? 'Hikvision user synchronization is not supported by this device/API.'
+            : `Failed to retrieve Hikvision users: ${err.message}`
+        };
+      }
+    }
+
+    return {
+      success: false,
+      users: [],
+      count: 0,
+      isUnsupported: false,
+      message: `BLOCKED — PHYSICAL DEVICE TEST REQUIRED: Device ${device.ipAddress}:${device.port} is on local physical network. Please run in Windows Desktop Mode (npm run electron:dev or LankaHR.exe) to fetch registered users.`
+    };
+  }
+
+  /**
+   * Analyze Hikvision users against existing LankaHR employees to determine:
+   * - Already mapped employees
+   * - Existing employees needing mapping updates
+   * - New unmapped Hikvision users for preview
+   */
+  public static analyzeHikvisionUsers(
+    hikvisionUsers: HikvisionUserRecord[],
+    employees: Employee[]
+  ): HikvisionUserSyncAnalysis {
+    const exactFpMap = new Map<string, Employee>();
+    const normFpMap = new Map<string, Employee>();
+    const codeMap = new Map<string, Employee>();
+    const normCodeMap = new Map<string, Employee>();
+    const idMap = new Map<string, Employee>();
+
+    employees.forEach(emp => {
+      if (emp.fingerprintUserId) {
+        exactFpMap.set(emp.fingerprintUserId.trim(), emp);
+        normFpMap.set(normalizeEmployeeId(emp.fingerprintUserId), emp);
+      }
+      if (emp.employeeCode) {
+        codeMap.set(emp.employeeCode.trim().toLowerCase(), emp);
+        normCodeMap.set(normalizeEmployeeId(emp.employeeCode), emp);
+      }
+      if (emp.id) {
+        idMap.set(emp.id, emp);
+      }
+    });
+
+    const previewList: HikvisionUserImportPreviewItem[] = [];
+    let alreadyMappedCount = 0;
+    let existingUsersCount = 0;
+    let newUsersCount = 0;
+
+    hikvisionUsers.forEach(user => {
+      const pId = String(user.employeeNo || '').trim();
+      if (!pId) return;
+
+      const normPId = normalizeEmployeeId(pId);
+
+      // Check 1: Exact fingerprint user ID match
+      const exactFpMatch = exactFpMap.get(pId);
+      if (exactFpMatch) {
+        alreadyMappedCount++;
+        previewList.push({
+          hikvisionPersonId: pId,
+          name: user.name,
+          userType: user.userType,
+          gender: user.gender,
+          cardNo: user.cardNo,
+          numOfFP: user.numOfFP,
+          numOfFace: user.numOfFace,
+          matchedEmployee: exactFpMatch,
+          matchType: 'EXACT_FINGERPRINT',
+          suggestedAction: 'ALREADY_MAPPED',
+          selected: false,
+          targetEmployeeId: exactFpMatch.id
+        });
+        return;
+      }
+
+      // Check 2: Normalized fingerprint user ID match
+      const normFpMatch = normFpMap.get(normPId);
+      if (normFpMatch) {
+        existingUsersCount++;
+        previewList.push({
+          hikvisionPersonId: pId,
+          name: user.name,
+          userType: user.userType,
+          gender: user.gender,
+          cardNo: user.cardNo,
+          numOfFP: user.numOfFP,
+          numOfFace: user.numOfFace,
+          matchedEmployee: normFpMatch,
+          matchType: 'NORMALIZED_MATCH',
+          suggestedAction: 'UPDATE_MAPPING',
+          selected: true,
+          targetEmployeeId: normFpMatch.id
+        });
+        return;
+      }
+
+      // Check 3: Employee Code match (e.g. EMP001 with '001' or '1' or 'EMP001')
+      const codeMatch = codeMap.get(pId.toLowerCase()) ||
+        codeMap.get(`emp${pId.toLowerCase()}`) ||
+        codeMap.get(`emp-${pId.toLowerCase()}`) ||
+        normCodeMap.get(normPId);
+
+      if (codeMatch) {
+        existingUsersCount++;
+        previewList.push({
+          hikvisionPersonId: pId,
+          name: user.name,
+          userType: user.userType,
+          gender: user.gender,
+          cardNo: user.cardNo,
+          numOfFP: user.numOfFP,
+          numOfFace: user.numOfFace,
+          matchedEmployee: codeMatch,
+          matchType: 'CODE_MATCH',
+          suggestedAction: 'UPDATE_MAPPING',
+          selected: true,
+          targetEmployeeId: codeMatch.id
+        });
+        return;
+      }
+
+      // Check 4: Unmapped new user
+      newUsersCount++;
+      previewList.push({
+        hikvisionPersonId: pId,
+        name: user.name,
+        userType: user.userType,
+        gender: user.gender,
+        cardNo: user.cardNo,
+        numOfFP: user.numOfFP,
+        numOfFace: user.numOfFace,
+        matchType: 'NONE',
+        suggestedAction: 'CREATE_NEW',
+        selected: true
+      });
+    });
+
+    return {
+      totalUsersFound: hikvisionUsers.length,
+      newUsersCount,
+      existingUsersCount,
+      alreadyMappedCount,
+      unmappedCount: newUsersCount,
+      previewList
     };
   }
 }

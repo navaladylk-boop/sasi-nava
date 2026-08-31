@@ -299,6 +299,20 @@ export default function App() {
     return res;
   };
 
+  // Handler: Batch Import Hikvision Employees
+  const handleBatchImportEmployees = async (items: {
+    hikvisionPersonId: string;
+    name?: string;
+    action: 'CREATE_NEW' | 'UPDATE_MAPPING' | 'SKIP';
+    targetEmployeeId?: string;
+  }[]) => {
+    const result = await DatabaseService.importHikvisionUsers(items, currentUserRole);
+    setEmployees([...DatabaseService.getEmployees()]);
+    setRawPunches([...DatabaseService.getRawPunches()]);
+    setAttendance([...DatabaseService.getProcessedAttendance()]);
+    return result;
+  };
+
   return (
     <WindowFrame
       currentLanguage={currentLanguage}
@@ -500,6 +514,7 @@ export default function App() {
             onSaveDevice={handleSaveDevice}
             onPunchesDownloaded={handlePunchesDownloaded}
             onUpdateEmployee={handleSaveEmployee}
+            onBatchImportEmployees={handleBatchImportEmployees}
             onBack={goBack}
           />
         )}
