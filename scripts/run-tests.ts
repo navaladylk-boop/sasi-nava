@@ -879,6 +879,65 @@ async function runTests() {
   console.log('=> PASS\n');
 
 
+  // ==========================================
+  // HIKVISION NORMALIZATION & RELINKING TESTS
+  // ==========================================
+  console.log('TEST 12.1: Hikvision Employee ID Normalization & Historical Punch Relinking');
+  
+  const { normalizeEmployeeId } = await import('../src/services/hikvisionService');
+  
+  const n1 = normalizeEmployeeId('00101');
+  const n2 = normalizeEmployeeId('101');
+  const n3 = normalizeEmployeeId(101);
+  const n4 = normalizeEmployeeId(' 101 ');
+  const n5 = normalizeEmployeeId('EMP-00101');
+
+  console.log(`- normalizeId results: '00101'->'${n1}', '101'->'${n2}', 101->'${n3}', ' 101 '->'${n4}', 'EMP-00101'->'${n5}'`);
+  if (n1 !== '101' || n2 !== '101' || n3 !== '101' || n4 !== '101' || n5 !== '101') {
+    throw new Error('FAIL: Employee ID normalization produced inconsistent results.');
+  }
+
+  // Test unmapped raw punch creation and historical relinking
+  (DatabaseService as any).state.rawPunches = [
+    {
+      id: 'hk-unmapped-01',
+      deviceId: 'dev-01',
+      deviceName: 'Main Gate',
+      deviceUserId: '101',
+      employeeId: undefined,
+      punchTimestamp: '2026-08-25T08:00:00Z',
+      punchDate: '2026-08-25',
+      punchTime: '08:00:00',
+      punchType: 'IN',
+      verificationMode: 'FINGERPRINT',
+      isProcessed: false
+    }
+  ];
+
+  console.log(`- Unmapped raw punches before import: ${(DatabaseService as any).state.rawPunches.filter((p: any) => !p.employeeId).length} (Expected: 1)`);
+
+  // Import Hikvision user '101' ('Kamal Silva')
+  const importResult = await DatabaseService.importHikvisionUsers([
+    {
+      hikvisionPersonId: '101',
+      name: 'Kamal Silva',
+      action: 'CREATE_NEW'
+    }
+  ]);
+
+  console.log(`- Import Result: Created: ${importResult.createdCount}, Updated: ${importResult.updatedCount}, Re-linked: ${importResult.relinkedPunchesCount}`);
+  if (importResult.createdCount !== 1 || importResult.relinkedPunchesCount !== 1) {
+    throw new Error('FAIL: Expected 1 created employee and 1 re-linked punch.');
+  }
+
+  const relinkedPunch = (DatabaseService as any).state.rawPunches.find((p: any) => p.id === 'hk-unmapped-01');
+  console.log(`- Re-linked punch employeeId: ${relinkedPunch?.employeeId}`);
+  if (!relinkedPunch?.employeeId) {
+    throw new Error('FAIL: Raw punch was not successfully re-linked to the newly imported employee!');
+  }
+  console.log('=> PASS\n');
+
+
   console.log('==================================================');
   console.log('ALL TESTS PASSED SUCCESSFULLY! Sri Lankan Statutory Compliance Secured.');
   console.log('==================================================');
