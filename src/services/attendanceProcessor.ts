@@ -44,7 +44,7 @@ export class AttendanceProcessor {
 
     const normalizeId = (idStr?: string | number): string => {
       if (idStr === undefined || idStr === null) return '';
-      return String(idStr).trim().toLowerCase().replace(/^emp-/, '').replace(/^0+/, '');
+      return String(idStr).trim().toLowerCase().replace(/^emp[-_]?/, '').replace(/^0+/, '');
     };
 
     // Group raw punches by employeeId (or fingerprintUserId / employeeCode) and date
@@ -200,11 +200,16 @@ export class AttendanceProcessor {
         // Sort punches chronologically
         dayPunches.sort((a, b) => a.punchTime.localeCompare(b.punchTime));
 
-        const firstPunch = dayPunches[0];
-        const lastPunch = dayPunches[dayPunches.length - 1];
+        const inPunches = dayPunches.filter(p => p.punchType === 'IN');
+        const outPunches = dayPunches.filter(p => p.punchType === 'OUT');
+
+        const firstPunch = inPunches.length > 0 ? inPunches[0] : dayPunches[0];
+        const lastPunch = outPunches.length > 0 
+          ? outPunches[outPunches.length - 1] 
+          : (dayPunches.length > 1 ? dayPunches[dayPunches.length - 1] : undefined);
 
         const firstInTime = firstPunch.punchTime.substring(0, 5); // HH:mm
-        const lastOutTime = dayPunches.length > 1 ? lastPunch.punchTime.substring(0, 5) : undefined;
+        const lastOutTime = lastPunch && lastPunch !== firstPunch ? lastPunch.punchTime.substring(0, 5) : undefined;
 
         if (!lastOutTime || firstInTime === lastOutTime) {
           warnings.push(`Employee ${emp.employeeCode} (${emp.fullName}) on ${dateStr} has only one punch at ${firstInTime} (Missing OUT punch).`);

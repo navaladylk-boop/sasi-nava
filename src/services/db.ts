@@ -815,7 +815,7 @@ export class DatabaseService {
 
     const normalizeId = (idStr?: string | number): string => {
       if (idStr === undefined || idStr === null) return '';
-      return String(idStr).trim().toLowerCase().replace(/^emp-/, '').replace(/^0+/, '');
+      return String(idStr).trim().toLowerCase().replace(/^emp[-_]?/, '').replace(/^0+/, '');
     };
 
     const empLookupMap = new Map<string, string>(); // normalizedId -> emp.id
@@ -853,21 +853,25 @@ export class DatabaseService {
 
     const normalizeId = (idStr?: string | number): string => {
       if (idStr === undefined || idStr === null) return '';
-      return String(idStr).trim().toLowerCase().replace(/^emp-/, '').replace(/^0+/, '');
+      return String(idStr).trim().toLowerCase().replace(/^emp[-_]?/, '').replace(/^0+/, '');
     };
 
     const existingMap = new Map<string, number>();
     this.state.rawPunches.forEach((p, idx) => {
-      const key = `${p.deviceId}_${normalizeId(p.deviceUserId)}_${p.punchTimestamp}_${p.punchType}`;
-      existingMap.set(key, idx);
+      const key1 = `${p.deviceId}_${normalizeId(p.deviceUserId)}_${p.punchTimestamp}_${p.punchType}`;
+      const key2 = `${p.deviceId}_${normalizeId(p.deviceUserId)}_${p.punchDate}_${p.punchTime}_${p.punchType}`;
+      existingMap.set(key1, idx);
+      existingMap.set(key2, idx);
     });
 
     let addedCount = 0;
     let updatedCount = 0;
 
     punches.forEach(p => {
-      const key = `${p.deviceId}_${normalizeId(p.deviceUserId)}_${p.punchTimestamp}_${p.punchType}`;
-      const existingIdx = existingMap.get(key);
+      const key1 = `${p.deviceId}_${normalizeId(p.deviceUserId)}_${p.punchTimestamp}_${p.punchType}`;
+      const key2 = `${p.deviceId}_${normalizeId(p.deviceUserId)}_${p.punchDate}_${p.punchTime}_${p.punchType}`;
+      const existingIdx = existingMap.get(key1) !== undefined ? existingMap.get(key1) : existingMap.get(key2);
+
       if (existingIdx !== undefined) {
         if (p.employeeId && !this.state.rawPunches[existingIdx].employeeId) {
           this.state.rawPunches[existingIdx].employeeId = p.employeeId;
@@ -875,7 +879,9 @@ export class DatabaseService {
         }
       } else {
         this.state.rawPunches.push(p);
-        existingMap.set(key, this.state.rawPunches.length - 1);
+        const newIdx = this.state.rawPunches.length - 1;
+        existingMap.set(key1, newIdx);
+        existingMap.set(key2, newIdx);
         addedCount++;
       }
     });

@@ -51,8 +51,53 @@ export interface HikvisionUserSyncAnalysis {
 export function normalizeEmployeeId(idStr?: string | number): string {
   if (idStr === undefined || idStr === null) return '';
   const str = String(idStr).trim().toLowerCase();
-  // Remove leading zeros and optional 'emp-' prefix for flexible matching
-  return str.replace(/^emp-/, '').replace(/^0+/, '');
+  // Remove leading zeros and optional 'emp-' or 'emp_' prefix for flexible matching
+  return str.replace(/^emp[-_]?/, '').replace(/^0+/, '');
+}
+
+export function parseHikvisionTimestamp(rawTime: string): {
+  punchDate: string;
+  punchTime: string;
+  punchTimestamp: string;
+} {
+  const timeStr = String(rawTime || '').trim();
+  let punchDate = '';
+  let punchTime = '';
+
+  // Extract local date (YYYY-MM-DD) and local time (HH:mm:ss) from the raw string directly
+  // This preserves the exact local time and prevents incorrect UTC shifts
+  if (timeStr.includes('T')) {
+    const parts = timeStr.split('T');
+    punchDate = parts[0];
+    punchTime = parts[1].substring(0, 8);
+  } else if (timeStr.includes(' ')) {
+    const parts = timeStr.split(' ');
+    punchDate = parts[0];
+    punchTime = parts[1].substring(0, 8);
+  } else {
+    const d = new Date(timeStr);
+    if (!isNaN(d.getTime())) {
+      punchDate = d.toISOString().substring(0, 10);
+      punchTime = d.toLocaleTimeString('en-GB', { hour12: false });
+    } else {
+      punchDate = timeStr.substring(0, 10);
+      punchTime = '08:00:00';
+    }
+  }
+
+  // Proper timezone-aware UTC conversion without ever appending "Z" manually to local time
+  let punchTimestamp = timeStr;
+  const parsed = new Date(timeStr);
+  if (!isNaN(parsed.getTime())) {
+    // If the original timestamp includes a timezone offset like +05:30, toISOString() converts accurately to UTC
+    punchTimestamp = parsed.toISOString();
+  } else {
+    // If no timezone is present, treat as Sri Lanka local time (+05:30) and convert properly
+    const slDate = new Date(`${punchDate}T${punchTime}+05:30`);
+    punchTimestamp = !isNaN(slDate.getTime()) ? slDate.toISOString() : `${punchDate}T${punchTime}+05:30`;
+  }
+
+  return { punchDate, punchTime, punchTimestamp };
 }
 
 export class HikvisionService {
@@ -219,11 +264,13 @@ export class HikvisionService {
       }
     });
 
-    // Map existing punches for fast lookup and re-linking
+    // Map existing punches for fast lookup, deduplication and re-linking
     const existingPunchesMap = new Map<string, RawAttendancePunch>();
     existingPunches.forEach(p => {
-      const key = `${p.deviceId}_${normalizeEmployeeId(p.deviceUserId)}_${p.punchTimestamp}_${p.punchType}`;
-      existingPunchesMap.set(key, p);
+      const key1 = `${p.deviceId}_${normalizeEmployeeId(p.deviceUserId)}_${p.punchTimestamp}_${p.punchType}`;
+      const key2 = `${p.deviceId}_${normalizeEmployeeId(p.deviceUserId)}_${p.punchDate}_${p.punchTime}_${p.punchType}`;
+      existingPunchesMap.set(key1, p);
+      existingPunchesMap.set(key2, p);
     });
 
     const newOrUpdatedPunches: RawAttendancePunch[] = [];
@@ -245,24 +292,23 @@ export class HikvisionService {
       userIdsFound.add(rawEmpId);
       timestampsFound.add(evt.time);
 
-      // Extract ISO Date & Time
-      let isoTime = evt.time;
-      let punchDate = '';
-      let punchTime = '';
+      // Extract local Date & Time and proper timezone-aware timestamp
+      const { punchDate, punchTime, punchTimestamp } = parseHikvisionTimestamp(evt.time);
 
-      if (isoTime.includes('T')) {
-        const parts = isoTime.split('T');
-        punchDate = parts[0];
-        punchTime = parts[1].substring(0, 8);
+      // Determine punch type (IN / OUT / BREAK_OUT / BREAK_IN)
+      // When Hikvision provides attendanceStatus, map directly without guessing
+      let punchType: 'IN' | 'OUT' | 'BREAK_OUT' | 'BREAK_IN' | 'AUTO' = 'AUTO';
+      const rawStatus = String(evt.attendanceStatus || evt.direction || '').toLowerCase().trim();
+      if (rawStatus === 'checkin' || rawStatus === 'in' || evt.direction === 'IN') {
+        punchType = 'IN';
+      } else if (rawStatus === 'checkout' || rawStatus === 'out' || evt.direction === 'OUT') {
+        punchType = 'OUT';
+      } else if (rawStatus === 'breakout' || rawStatus === 'break_out') {
+        punchType = 'BREAK_OUT';
+      } else if (rawStatus === 'breakin' || rawStatus === 'break_in') {
+        punchType = 'BREAK_IN';
       } else {
-        const d = new Date(isoTime);
-        punchDate = !isNaN(d.getTime()) ? d.toISOString().substring(0, 10) : isoTime.substring(0, 10);
-        punchTime = !isNaN(d.getTime()) ? d.toLocaleTimeString('en-GB') : '08:00:00';
-      }
-
-      // Determine punch type (IN / OUT / AUTO)
-      let punchType: 'IN' | 'OUT' | 'BREAK_OUT' | 'BREAK_IN' | 'AUTO' = evt.direction || 'AUTO';
-      if (punchType === 'AUTO') {
+        // Fallback only when device does not provide a usable attendance status
         const hour = parseInt(punchTime.substring(0, 2), 10) || 0;
         punchType = hour >= 13 ? 'OUT' : 'IN';
       }
@@ -274,8 +320,8 @@ export class HikvisionService {
       else if (evt.verifyMode === 'PASSWORD' || evt.minor === 77) verifyMode = 'PASSWORD';
 
       const normUserKey = normalizeEmployeeId(rawEmpId);
-      const punchTimestamp = `${punchDate}T${punchTime}Z`;
-      const recordKey = `${device.id}_${normUserKey}_${punchTimestamp}_${punchType}`;
+      const recordKey1 = `${device.id}_${normUserKey}_${punchTimestamp}_${punchType}`;
+      const recordKey2 = `${device.id}_${normUserKey}_${punchDate}_${punchTime}_${punchType}`;
 
       // Flexible employee matching (fingerprintUserId / employeeCode / id)
       const matchedEmp = empLookupMap.get(normUserKey);
@@ -284,7 +330,7 @@ export class HikvisionService {
         unmappedCount++;
       }
 
-      const existingPunch = existingPunchesMap.get(recordKey);
+      const existingPunch = existingPunchesMap.get(recordKey1) || existingPunchesMap.get(recordKey2);
 
       if (existingPunch) {
         // If punch exists in SQLite without employeeId and now matchedEmp exists, re-link it!
@@ -316,7 +362,8 @@ export class HikvisionService {
         createdAt: new Date().toISOString()
       };
 
-      existingPunchesMap.set(recordKey, punchRecord);
+      existingPunchesMap.set(recordKey1, punchRecord);
+      existingPunchesMap.set(recordKey2, punchRecord);
       newOrUpdatedPunches.push(punchRecord);
       newRecordsCount++;
     });

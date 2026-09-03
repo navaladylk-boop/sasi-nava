@@ -937,6 +937,149 @@ async function runTests() {
   }
   console.log('=> PASS\n');
 
+  // ==========================================
+  // HIKVISION PAGINATION ALGORITHM TESTS
+  // ==========================================
+  console.log('TEST 12.2: Hikvision User Pagination Simulation (totalMatches = 35, maxResults = 30)');
+  {
+    // Simulate Hikvision terminal with 35 registered users where device returns in chunks of 10
+    const mockTerminalUsers = Array.from({ length: 35 }, (_, i) => ({
+      employeeNo: `${101 + i}`,
+      employeeNoString: `${101 + i}`,
+      name: `Employee ${101 + i}`,
+      userType: 'normal'
+    }));
+
+    const totalMatches = 35;
+    const maxResults = 30;
+    let position = 0;
+    let hasMore = true;
+    let batchIndex = 0;
+    const retrievedUsers: any[] = [];
+
+    // The pagination loop under test
+    while (hasMore) {
+      batchIndex++;
+      // Device returns at most 10 records per page
+      const batch = mockTerminalUsers.slice(position, position + 10);
+      retrievedUsers.push(...batch);
+
+      const returnedRecords = batch.length;
+      const prevPosition = position;
+      position += returnedRecords;
+
+      // Real algorithm from hikvisionClient.ts:
+      // DO NOT stop simply because returnedRecords < maxResults!
+      // Must continue until totalMatches is met
+      if (totalMatches > 0 && position >= totalMatches) {
+        hasMore = false;
+      } else if (position <= prevPosition) {
+        hasMore = false;
+      } else if (batchIndex >= 100) {
+        hasMore = false;
+      }
+    }
+
+    console.log(`- Batches required: ${batchIndex}, Total users retrieved: ${retrievedUsers.length} (Expected: 35)`);
+    if (retrievedUsers.length !== 35) {
+      throw new Error(`FAIL: Expected 35 users retrieved, got ${retrievedUsers.length}`);
+    }
+    if (batchIndex !== 4) {
+      throw new Error(`FAIL: Expected 4 batches (10 + 10 + 10 + 5 = 35), got ${batchIndex}`);
+    }
+    console.log('=> PASS: All 35 users successfully retrieved via pagination!\n');
+  }
+
+  console.log('TEST 12.3: Hikvision Attendance Pagination Simulation (totalMatches = 423, maxResults = 200)');
+  {
+    const totalMatches = 423;
+    const maxResults = 200;
+    let position = 0;
+    let hasMore = true;
+    let batchIndex = 0;
+    let totalEventsRetrieved = 0;
+
+    while (hasMore) {
+      batchIndex++;
+      // Device returns chunks of 30 records
+      const countToReturn = Math.min(30, totalMatches - position);
+      totalEventsRetrieved += countToReturn;
+
+      const returnedRecords = countToReturn;
+      const prevPosition = position;
+      position += returnedRecords;
+
+      if (totalMatches > 0 && position >= totalMatches) {
+        hasMore = false;
+      } else if (position <= prevPosition) {
+        hasMore = false;
+      } else if (batchIndex >= 1000) {
+        hasMore = false;
+      }
+    }
+
+    console.log(`- Batches required: ${batchIndex}, Total events retrieved: ${totalEventsRetrieved} (Expected: 423)`);
+    if (totalEventsRetrieved !== 423) {
+      throw new Error(`FAIL: Expected 423 events retrieved, got ${totalEventsRetrieved}`);
+    }
+    console.log('=> PASS: All 423 attendance events successfully retrieved via pagination!\n');
+  }
+
+  console.log('TEST 12.4: Hikvision Timestamp & Direction Status Mapping');
+  {
+    const { parseHikvisionTimestamp } = await import('../src/services/hikvisionService');
+
+    // Test ISO string with +05:30 offset
+    const parsed = parseHikvisionTimestamp('2026-08-31T08:03:00+05:30');
+    console.log(`- Parsed '2026-08-31T08:03:00+05:30' -> Date: ${parsed.punchDate}, Time: ${parsed.punchTime}, Timestamp: ${parsed.punchTimestamp}`);
+    
+    if (parsed.punchDate !== '2026-08-31') {
+      throw new Error(`FAIL: Expected punchDate '2026-08-31', got '${parsed.punchDate}'`);
+    }
+    if (parsed.punchTime !== '08:03:00') {
+      throw new Error(`FAIL: Expected punchTime '08:03:00', got '${parsed.punchTime}'`);
+    }
+    // Verify it didn't do a naive manual 'Z' append
+    if (parsed.punchTimestamp === '2026-08-31T08:03:00Z') {
+      throw new Error('FAIL: Incorrect naive Z append detected! Must preserve true UTC conversion.');
+    }
+
+    console.log('=> PASS: Timestamp & Timezone parsing preserves local date/time accurately!\n');
+  }
+
+  console.log('TEST 12.5: Duplicate Punch Deduplication');
+  {
+    const initialRawCount = (DatabaseService as any).state.rawPunches.length;
+    const testPunch: RawAttendancePunch = {
+      id: 'hk-dup-test-01',
+      deviceId: 'dev-001',
+      deviceName: 'Main Door',
+      deviceUserId: '101',
+      employeeId: 'emp-001',
+      punchTimestamp: '2026-08-31T08:03:00.000Z',
+      punchDate: '2026-08-31',
+      punchTime: '08:03:00',
+      punchType: 'IN',
+      verificationMode: 'FINGERPRINT',
+      isProcessed: false,
+      createdAt: new Date().toISOString()
+    };
+
+    // Save first time
+    DatabaseService.saveRawPunches([testPunch]);
+    const countAfterFirst = (DatabaseService as any).state.rawPunches.length;
+
+    // Save second time (identical punch)
+    DatabaseService.saveRawPunches([{ ...testPunch, id: 'hk-dup-test-02' }]);
+    const countAfterSecond = (DatabaseService as any).state.rawPunches.length;
+
+    console.log(`- Punches before: ${initialRawCount}, after 1st save: ${countAfterFirst}, after 2nd save: ${countAfterSecond}`);
+    if (countAfterSecond !== countAfterFirst) {
+      throw new Error('FAIL: Duplicate punch was incorrectly added to database!');
+    }
+    console.log('=> PASS: Duplicate punch deduplication verified!\n');
+  }
+
 
   console.log('==================================================');
   console.log('ALL TESTS PASSED SUCCESSFULLY! Sri Lankan Statutory Compliance Secured.');

@@ -27,6 +27,7 @@ export interface HikvisionEventLog {
   cardNo?: string;
   verifyMode?: 'FINGERPRINT' | 'FACE' | 'CARD' | 'PASSWORD';
   direction?: 'IN' | 'OUT' | 'AUTO';
+  attendanceStatus?: string;
 }
 
 export interface HikvisionDownloadResponse {

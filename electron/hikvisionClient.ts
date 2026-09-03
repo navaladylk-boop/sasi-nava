@@ -30,7 +30,10 @@ export interface HikvisionEventLog {
   cardNo?: string;
   verifyMode?: string;
   direction?: 'IN' | 'OUT' | 'AUTO';
+  attendanceStatus?: string;
 }
+
+const MAX_PAGES = 500;
 
 export interface HikvisionUserRecord {
   employeeNo: string;
@@ -400,7 +403,11 @@ export class HikvisionISAPIClient {
 
           let batchFilteredOut = 0;
           matches.forEach((item: any) => {
-            const empNo = item.employeeNoString || (item.employeeNo !== undefined && item.employeeNo !== null ? String(item.employeeNo) : undefined) || item.cardNo;
+            const empNo = item.employeeNoString || 
+                          (item.employeeNo !== undefined && item.employeeNo !== null ? String(item.employeeNo) : undefined) || 
+                          item.userNo ||
+                          item.id ||
+                          item.cardNo;
             if (empNo) {
               let verifyMode: 'FINGERPRINT' | 'FACE' | 'CARD' | 'PASSWORD' = 'FINGERPRINT';
               if (item.currentVerifyMode === 'face' || item.minor === 76) verifyMode = 'FACE';
@@ -408,8 +415,9 @@ export class HikvisionISAPIClient {
               else if (item.currentVerifyMode === 'pwd' || item.minor === 77) verifyMode = 'PASSWORD';
 
               let direction: 'IN' | 'OUT' | 'AUTO' = 'AUTO';
-              if (item.attendanceStatus === 'checkIn' || item.type === 0) direction = 'IN';
-              else if (item.attendanceStatus === 'checkOut' || item.type === 1) direction = 'OUT';
+              const rawStatus = String(item.attendanceStatus || '').toLowerCase().trim();
+              if (rawStatus === 'checkin' || item.type === 0 || rawStatus === 'in') direction = 'IN';
+              else if (rawStatus === 'checkout' || item.type === 1 || rawStatus === 'out') direction = 'OUT';
 
               const serialNo = String(item.serialNo || `${item.time}_${empNo}`);
               const dedupKey = `${serialNo}_${empNo}_${item.time}`;
@@ -424,7 +432,8 @@ export class HikvisionISAPIClient {
                   minor: item.minor || 0,
                   cardNo: item.cardNo,
                   verifyMode,
-                  direction
+                  direction,
+                  attendanceStatus: item.attendanceStatus
                 });
               } else {
                 batchFilteredOut++;
@@ -443,12 +452,26 @@ export class HikvisionISAPIClient {
             onProgress({ totalFetched: allEvents.length, currentBatchSize: matches.length });
           }
 
-          if (matches.length < maxResults || (totalMatches && position + matches.length >= totalMatches)) {
+          // Advance position by returned count
+          const returnedRecords = matches.length;
+          const prevPosition = position;
+          position += returnedRecords;
+
+          // Stop pagination ONLY when totalMatches is met, position does not advance, or max pages reached
+          // Do NOT stop simply because returnedRecords < maxResults
+          if (totalMatches > 0 && position >= totalMatches) {
+            console.log(`[Hikvision Diagnostic] Reached totalMatches (${position}/${totalMatches}). Ending attendance pagination.`);
             hasMore = false;
-          } else {
-            position += matches.length;
+          } else if (position <= prevPosition) {
+            console.warn(`[Hikvision Diagnostic] Position did not advance (${position} <= ${prevPosition}). Ending pagination.`);
+            hasMore = false;
+          } else if (batchIndex >= MAX_PAGES) {
+            console.warn(`[Hikvision Diagnostic] Reached MAX_PAGES (${MAX_PAGES}) limit. Ending pagination.`);
+            hasMore = false;
           }
         } else {
+          // returnedRecords === 0
+          console.log(`[Hikvision Diagnostic] Batch #${batchIndex}: 0 records returned. Ending attendance pagination.`);
           hasMore = false;
         }
       } catch (err: any) {
@@ -514,17 +537,24 @@ export class HikvisionISAPIClient {
 
         let batchFilteredOut = 0;
         eventBlocks.forEach(block => {
-          const empNo = getTag(block, 'employeeNoString') || getTag(block, 'cardNo') || getTag(block, 'employeeNo');
+          const empNo = getTag(block, 'employeeNoString') || getTag(block, 'employeeNo') || getTag(block, 'userNo') || getTag(block, 'cardNo');
           const time = getTag(block, 'time');
           const minor = parseInt(getTag(block, 'minor') || '0', 10);
           const major = parseInt(getTag(block, 'major') || '5', 10);
           const serialNo = getTag(block, 'serialNo') || `${time}_${empNo}`;
+          const attStatus = getTag(block, 'attendanceStatus');
+          const typeVal = getTag(block, 'type');
 
           if (empNo && time) {
             let verifyMode: 'FINGERPRINT' | 'FACE' | 'CARD' | 'PASSWORD' = 'FINGERPRINT';
             if (minor === 76) verifyMode = 'FACE';
             else if (minor === 1) verifyMode = 'CARD';
             else if (minor === 77) verifyMode = 'PASSWORD';
+
+            let direction: 'IN' | 'OUT' | 'AUTO' = 'AUTO';
+            const rawStatus = (attStatus || '').toLowerCase().trim();
+            if (rawStatus === 'checkin' || typeVal === '0' || rawStatus === 'in') direction = 'IN';
+            else if (rawStatus === 'checkout' || typeVal === '1' || rawStatus === 'out') direction = 'OUT';
 
             const dedupKey = `${serialNo}_${empNo}_${time}`;
             if (!eventSerialSet.has(dedupKey)) {
@@ -536,7 +566,8 @@ export class HikvisionISAPIClient {
                 major,
                 minor,
                 verifyMode,
-                direction: 'AUTO'
+                direction,
+                attendanceStatus: attStatus || undefined
               });
             } else {
               batchFilteredOut++;
@@ -550,10 +581,20 @@ export class HikvisionISAPIClient {
           onProgress({ totalFetched: allEvents.length, currentBatchSize: eventBlocks.length });
         }
 
-        if (eventBlocks.length < maxResults) {
+        const totalMatches = parseInt(getTag(xml, 'totalMatches') || getTag(xml, 'numOfMatches') || '0', 10);
+        const returnedRecords = eventBlocks.length;
+        const prevPosition = position;
+        position += returnedRecords;
+
+        if (totalMatches > 0 && position >= totalMatches) {
+          console.log(`[Hikvision Diagnostic] XML reached totalMatches (${position}/${totalMatches}). Ending attendance pagination.`);
           hasMore = false;
-        } else {
-          position += eventBlocks.length;
+        } else if (position <= prevPosition) {
+          console.warn(`[Hikvision Diagnostic] XML position did not advance (${position} <= ${prevPosition}). Ending pagination.`);
+          hasMore = false;
+        } else if (batchIndex >= MAX_PAGES) {
+          console.warn(`[Hikvision Diagnostic] XML reached MAX_PAGES (${MAX_PAGES}) limit. Ending pagination.`);
+          hasMore = false;
         }
       } catch (err: any) {
         console.error(`[Hikvision Diagnostic] XML Query Error at position ${position}: ${err?.message}`);
@@ -630,7 +671,7 @@ export class HikvisionISAPIClient {
           jsonSuccess = true;
           userList.forEach(u => {
             if (!u) return;
-            const empNo = String(u.employeeNo || u.employeeNoString || u.userNo || u.id || '').trim();
+            const empNo = String(u.employeeNoString || u.employeeNo || u.userNo || u.id || '').trim();
             if (empNo) {
               const name = String(u.name || '').trim();
               const userType = String(u.userType || 'normal');
@@ -663,12 +704,26 @@ export class HikvisionISAPIClient {
             }
           });
 
-          if (userList.length < maxResults || (totalMatches && position + userList.length >= totalMatches)) {
+          // Paging advancement: advance position by returned count
+          const returnedRecords = userList.length;
+          const prevPosition = position;
+          position += returnedRecords;
+
+          // Stop pagination ONLY when totalMatches is met, position does not advance, or max pages reached
+          // Do NOT stop simply because returnedRecords < maxResults
+          if (totalMatches > 0 && position >= totalMatches) {
+            console.log(`[Hikvision User Import] Reached totalMatches (${position}/${totalMatches}). Ending pagination.`);
             hasMore = false;
-          } else {
-            position += userList.length;
+          } else if (position <= prevPosition) {
+            console.warn(`[Hikvision User Import] Position did not advance (${position} <= ${prevPosition}). Ending pagination.`);
+            hasMore = false;
+          } else if (batchIndex >= MAX_PAGES) {
+            console.warn(`[Hikvision User Import] Reached MAX_PAGES (${MAX_PAGES}) limit. Ending pagination.`);
+            hasMore = false;
           }
         } else {
+          // returnedRecords === 0
+          console.log(`[Hikvision User Import] 0 records returned. Ending pagination.`);
           hasMore = false;
         }
       } catch (err: any) {
@@ -728,7 +783,7 @@ export class HikvisionISAPIClient {
         };
 
         userBlocks.forEach(block => {
-          const empNo = getTag(block, 'employeeNo') || getTag(block, 'employeeNoString') || getTag(block, 'userNo');
+          const empNo = getTag(block, 'employeeNoString') || getTag(block, 'employeeNo') || getTag(block, 'userNo');
           if (empNo) {
             const name = getTag(block, 'name');
             const userType = getTag(block, 'userType') || 'normal';
@@ -753,10 +808,20 @@ export class HikvisionISAPIClient {
           }
         });
 
-        if (userBlocks.length < maxResults) {
+        const totalMatches = parseInt(getTag(xml, 'totalMatches') || getTag(xml, 'numOfMatches') || '0', 10);
+        const returnedRecords = userBlocks.length;
+        const prevPosition = position;
+        position += returnedRecords;
+
+        if (totalMatches > 0 && position >= totalMatches) {
+          console.log(`[Hikvision User Import] XML reached totalMatches (${position}/${totalMatches}). Ending pagination.`);
           hasMore = false;
-        } else {
-          position += userBlocks.length;
+        } else if (position <= prevPosition) {
+          console.warn(`[Hikvision User Import] XML position did not advance (${position} <= ${prevPosition}). Ending pagination.`);
+          hasMore = false;
+        } else if (batchIndex >= MAX_PAGES) {
+          console.warn(`[Hikvision User Import] XML reached MAX_PAGES (${MAX_PAGES}) limit. Ending pagination.`);
+          hasMore = false;
         }
       } catch (err: any) {
         console.error(`[Hikvision User Import] XML Query Error: ${err?.message}`);
